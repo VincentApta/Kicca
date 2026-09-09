@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS project_members;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS team_members;
+DROP TABLE IF EXISTS teams;
+DROP TYPE IF EXISTS project_role;
