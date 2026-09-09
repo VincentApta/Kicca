@@ -29,8 +29,16 @@ func Load() (*Config, error) {
 		GHEncKey:      os.Getenv("GH_ENC_KEY"),
 		GitHubAPIBase: envOr("GITHUB_API_BASE", "https://api.github.com"),
 	}
-	// T1: only DATABASE_URL/JWT_SECRET would gate startup in later tickets;
-	// health endpoint runs before DB exists, so nothing is fatal yet.
+	// The server now opens the DB and signs JWTs at startup; refuse to boot
+	// without the essentials. ADMIN_*/GH_* stay optional (seed skips).
+	for k, v := range map[string]string{
+		"DATABASE_URL": cfg.DatabaseURL,
+		"JWT_SECRET":   cfg.JWTSecret,
+	} {
+		if v == "" {
+			return nil, fmt.Errorf("%s is required", k)
+		}
+	}
 	return cfg, nil
 }
 

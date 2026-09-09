@@ -1,10 +1,12 @@
-// kicca api server. T1: health endpoint + env config only.
+// kicca api server.
 package main
 
 import (
 	"log"
 
 	"github.com/VincentApta/Kicca/api/internal/config"
+	"github.com/VincentApta/Kicca/api/internal/db"
+	"github.com/VincentApta/Kicca/api/internal/handlers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
@@ -15,14 +17,17 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
+	gdb, err := db.Open(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("db: %v", err)
+	}
+	if err := db.SeedAdmin(gdb, cfg.AdminEmail, cfg.AdminPassword); err != nil {
+		log.Fatalf("seed: %v", err)
+	}
+
 	app := fiber.New()
 	app.Use(recover.New())
-
-	// Static routes must be registered before any parametric ones
-	// (e.g. /api/health before /api/:resource) so Fiber matches them first.
-	app.Get("/api/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
-	})
+	handlers.Register(app, gdb, cfg.JWTSecret)
 
 	log.Printf("kicca api listening on :%s (%s)", cfg.Port, cfg)
 	if err := app.Listen(":" + cfg.Port); err != nil {
