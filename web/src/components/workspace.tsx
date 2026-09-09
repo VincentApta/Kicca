@@ -8,7 +8,7 @@ import { BoardView } from './board/board-view'
 import { ListView } from './list-view'
 import { CreateTaskDialog } from './create-task-dialog'
 import { TaskDrawer } from './task-drawer'
-import { TeamsPage, UsersPage } from './admin-pages'
+import { ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
 import { BoardSkeleton, EmptyState, ListSkeleton } from './skeletons'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
@@ -74,12 +74,20 @@ export function Workspace() {
     if (!currentProjectId) return
     setDetail(null)
     setLabels([])
+    refreshProject()
+  }, [currentProjectId])
+
+  // refetch current project detail/labels/projects — used after settings
+  // mutations so board, topbar and switcher see the new state.
+  function refreshProject() {
+    if (!currentProjectId) return
     api.getProject(currentProjectId).then(setDetail, () => {})
     api.listLabels(currentProjectId).then(
       ({ data }) => setLabels(data),
       () => {},
     )
-  }, [currentProjectId])
+    api.listProjects().then(({ data }) => setProjects(data), () => {})
+  }
 
   // debounce search box → filters.q
   useEffect(() => {
@@ -227,7 +235,8 @@ export function Workspace() {
         search="" onSearch={() => {}} project={null}
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
         currentProjectId={null} onSwitchProject={() => {}}
-        onNavigate={() => {}} onMyTasks={() => {}} myTasksActive={false}>
+        onNavigate={() => {}} onMyTasks={() => {}} myTasksActive={false}
+        settingsAvailable={false}>
         <EmptyState
           title="No projects yet"
           hint="Ask an admin to add you to a project — or create one once admin pages land."
@@ -240,6 +249,9 @@ export function Workspace() {
   const drawerTask = tasks.find((t) => t.id === drawerId) ?? null
   const hasMore = tasks.length < meta.total
   const filtered = filtersActive(filters) + (search.trim() ? 1 : 0) > 0
+  // project settings reach: global admin or project_admin (sidebar T5 pattern)
+  const canManageProject =
+    me.global_role === 'admin' || detail?.my_role === 'project_admin'
 
   return (
     <ShellFrame
@@ -275,8 +287,21 @@ export function Workspace() {
         setFilters({ ...EMPTY_FILTERS, assignee_id: me.id })
       }}
       myTasksActive={view === 'list' && filters.assignee_id === me.id}
+      settingsAvailable={canManageProject}
     >
-      {view === 'teams' ? (
+      {view === 'settings' ? (
+        project ? (
+          <ProjectSettingsPage
+            project={project}
+            detail={detail}
+            labels={labels}
+            canManage={canManageProject}
+            onRefresh={refreshProject}
+          />
+        ) : (
+          <BootSkeleton />
+        )
+      ) : view === 'teams' ? (
         <TeamsPage />
       ) : view === 'users' ? (
         <UsersPage />
@@ -386,6 +411,7 @@ type ShellProps = {
   onNavigate: (v: View) => void
   onMyTasks: () => void
   myTasksActive: boolean
+  settingsAvailable: boolean
 }
 
 function ShellFrame({ children, ...shell }: ShellProps) {
@@ -402,6 +428,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
         onToggleCollapsed={shell.onToggleCollapsed}
         me={shell.me}
         myTasksActive={shell.myTasksActive}
+        settingsAvailable={shell.settingsAvailable}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
