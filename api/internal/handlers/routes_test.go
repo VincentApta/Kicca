@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/gofiber/fiber/v2"
@@ -179,6 +180,62 @@ func setCookieHas(t *testing.T, h http.Header, attr string) bool {
 	return false
 }
 
+func TestLoginRateLimit(t *testing.T) {
+	app, _ := newTestApp(t)
+
+	// 10 bad logins (fiber's test conn always reports the same remote addr,
+	// so IP and email buckets trip together here) → 401 ×10, then 429
+	badCreds := func() (int, map[string]interface{}) {
+		status, body, _ := do(t, app, http.MethodPost, "/api/auth/login",
+			`{"email":"`+adminEmail+`","password":"wrong"}`, "")
+		return status, body
+	}
+	for i := 0; i < 10; i++ {
+		if status, body := badCreds(); status != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: got %d %v, want 401", i+1, status, body)
+		}
+	}
+	if status, body := badCreds(); status != http.StatusTooManyRequests || errCode(t, body) != "rate_limited" {
+		t.Fatalf("11th attempt: got %d %v, want 429 rate_limited", status, body)
+	}
+
+	// the limit guards the DB lookup: valid credentials also 429
+	if status, body, _ := do(t, app, http.MethodPost, "/api/auth/login",
+		`{"email":"`+adminEmail+`","password":"`+adminPass+`"}`, ""); status != http.StatusTooManyRequests {
+		t.Fatalf("valid creds while limited: got %d %v, want 429", status, body)
+	}
+
+	// a different email from the same source is still IP-limited
+	if status, body, _ := do(t, app, http.MethodPost, "/api/auth/login",
+		`{"email":"other@example.com","password":"x"}`, ""); status != http.StatusTooManyRequests {
+		t.Fatalf("other email same ip: got %d %v, want 429", status, body)
+	}
+}
+
+func TestLoginLimiterKeys(t *testing.T) {
+	// unit test: the two buckets are independent per key and the window slides
+	l := newLoginLimiter()
+	now := time.Now()
+	for i := 0; i < 10; i++ {
+		if !l.allow("ip:1.2.3.4", now) {
+			t.Fatalf("ip attempt %d: want allowed", i+1)
+		}
+	}
+	if l.allow("ip:1.2.3.4", now) {
+		t.Fatal("ip over limit: want denied")
+	}
+	if !l.allow("ip:5.6.7.8", now) {
+		t.Fatal("other ip must be unaffected")
+	}
+	if !l.allow("email:x@example.com", now) {
+		t.Fatal("email bucket must be unaffected by ip bucket")
+	}
+	// one window later everything is allowed again
+	if !l.allow("ip:1.2.3.4", now.Add(l.window+time.Second)) {
+		t.Fatal("after window: want allowed")
+	}
+}
+
 func TestDisabledUserRejected(t *testing.T) {
 	app, _ := newTestApp(t)
 	admin := loginAndGet(t, app, adminEmail, adminPass)
@@ -251,8 +308,43 @@ func TestDuplicateEmailConflict(t *testing.T) {
 	}
 }
 
-func TestListUsersPagination(t *testing.T) {
+// TestLastAdminGuard: demoting/disabling the only enabled global admin → 409;
+// allowed again once a second admin exists.
+func TestLastAdminGuard(t *testing.T) {
 	app, _ := newTestApp(t)
+	admin := loginAndGet(t, app, adminEmail, adminPass)
+	adminID := func() string {
+		t.Helper()
+		status, body, _ := do(t, app, http.MethodGet, "/api/users?per_page=100", "", admin)
+		if status != http.StatusOK {
+			t.Fatalf("list users: %d", status)
+		}
+		data, _ := body["data"].([]interface{})
+		for _, row := range data {
+			if rowMap(t, row)["global_role"] == "admin" {
+				return rowMap(t, row)["id"].(string)
+			}
+		}
+		t.Fatal("no admin found")
+		return ""
+	}()
+
+	for _, payload := range []string{`{"global_role":"member"}`, `{"disabled":true}`} {
+		if status, body, _ := do(t, app, http.MethodPatch, "/api/users/"+adminID, payload, admin); status != http.StatusConflict || errCode(t, body) != "last_admin" {
+			t.Fatalf("last admin %s: got %d %v, want 409 last_admin", payload, status, body)
+		}
+	}
+
+	// a second admin unblocks both mutations (and the seed admin demotes fine)
+	if status, _ := createUserViaAPI(t, app, admin, "admin2@example.com", "admin2-pass-1", "admin"); status != http.StatusCreated {
+		t.Fatalf("create second admin: %d", status)
+	}
+	if status, _, _ := do(t, app, http.MethodPatch, "/api/users/"+adminID, `{"disabled":true}`, admin); status != http.StatusOK {
+		t.Fatalf("disable with second admin: got %d, want 200", status)
+	}
+}
+
+func TestListUsersPagination(t *testing.T) {	app, _ := newTestApp(t)
 	admin := loginAndGet(t, app, adminEmail, adminPass)
 	for i := 0; i < 3; i++ {
 		email := string(rune('a'+i)) + "@example.com"

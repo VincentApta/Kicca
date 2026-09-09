@@ -135,6 +135,21 @@ func PatchUser(gdb *gorm.DB) fiber.Handler {
 				updates["disabled_at"] = nil
 			}
 		}
+		// last-admin guard: demoting or disabling the only enabled global
+		// admin would lock everyone out of user management
+		demotes := req.GlobalRole != nil && *req.GlobalRole != roleAdmin
+		disables := req.Disabled != nil && *req.Disabled
+		if user.GlobalRole == roleAdmin && user.DisabledAt == nil && (demotes || disables) {
+			var others int64
+			if err := gdb.Model(&models.User{}).
+				Where("global_role = ? AND disabled_at IS NULL AND id <> ?", roleAdmin, user.ID).
+				Count(&others).Error; err != nil {
+				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not count admins")
+			}
+			if others == 0 {
+				return httpErr(c, fiber.StatusConflict, "last_admin", "cannot demote or disable the last enabled admin")
+			}
+		}
 		if len(updates) > 0 {
 			if err := gdb.Model(&user).Updates(updates).Error; err != nil {
 				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not update user")
