@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS task_labels;
+DROP TABLE IF EXISTS labels;
+DROP TABLE IF EXISTS tasks;
+DROP TYPE IF EXISTS task_priority;
+DROP TYPE IF EXISTS task_status;

@@ -51,4 +51,22 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string) {
 	projects.Patch("/:id", PatchProject(gdb))
 	projects.Delete("/:id", DeleteProject(gdb))
 	projects.Put("/:id/members", ReplaceProjectMembers(gdb))
+	projects.Get("/:id/tasks", ListTasks(gdb))
+	projects.Post("/:id/tasks", CreateTask(gdb))
+	projects.Get("/:id/labels", ListLabels(gdb))
+	projects.Post("/:id/labels", CreateLabel(gdb))
+
+	// tasks — all parametric; visibility via the task's project (404 no-leak)
+	tasks := api.Group("/tasks", middleware.RequireAuth(jwtSecret, gdb))
+	tasks.Get("/:id", GetTask(gdb))
+	tasks.Patch("/:id", PatchTask(gdb))
+	tasks.Delete("/:id", DeleteTask(gdb))
+	tasks.Post("/:id/restore", RestoreTask(gdb))
+	tasks.Post("/:id/move", MoveTask(gdb))
+	tasks.Get("/:id/comments", ListComments(gdb))
+	tasks.Post("/:id/comments", CreateComment(gdb))
+
+	// labels — DELETE only (creation is per-project above)
+	labels := api.Group("/labels", middleware.RequireAuth(jwtSecret, gdb))
+	labels.Delete("/:id", DeleteLabel(gdb))
 }
