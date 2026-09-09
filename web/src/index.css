@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource/outfit/600.css";
+@import "@fontsource/inter-tight/400.css";
+@import "@fontsource/inter-tight/500.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: 'Outfit', var(--font-sans);
+    --font-sans: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    /* kicca DESIGN.md extras */
+    --color-well: var(--well);
+    --color-priority-urgent: #f87171;
+    --color-priority-high: #fbbf24;
+    --color-priority-medium: #60a5fa;
+    --color-priority-low: #94a3b8;
+    --color-status-done: #34d399;
+    --color-status-blocked: #f87171;
+    --color-status-in-progress: #60a5fa;
+    --color-status-review: #c084fc;
+    --color-status-inbox: #fbbf24;
+    --color-status-backlog: #97a0af;
+    /* DESIGN.md shape language: inputs/buttons 8px, cards/drawer 12px, modals 16px */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-3xl: calc(var(--radius-2xl) * 1.4);
+    --radius-4xl: calc(var(--radius-2xl) * 1.8);
+}
+
+/* Light theme — DESIGN.md "Light Hex" column */
+:root {
+    --background: #e8ecf1;
+    --foreground: #1b1f27;
+    --card: #f2f5f9;
+    --card-foreground: #1b1f27;
+    --popover: #f2f5f9;
+    --popover-foreground: #1b1f27;
+    --primary: #0d9488;
+    --primary-foreground: #ffffff;
+    --secondary: #dde2e9;
+    --secondary-foreground: #1b1f27;
+    --muted: #dde2e9;
+    --muted-foreground: #5b6472;
+    --accent: #dde2e9;
+    --accent-foreground: #1b1f27;
+    --destructive: #f87171;
+    --border: #c9d1dc;
+    --input: #c9d1dc;
+    --ring: #0d9488;
+    --chart-1: #0d9488;
+    --chart-2: #60a5fa;
+    --chart-3: #fbbf24;
+    --chart-4: #c084fc;
+    --chart-5: #f87171;
+    --radius: 8px;
+    --sidebar: #dde2e9;
+    --sidebar-foreground: #1b1f27;
+    --sidebar-primary: #0d9488;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f2f5f9;
+    --sidebar-accent-foreground: #1b1f27;
+    --sidebar-border: #c9d1dc;
+    --sidebar-ring: #0d9488;
+    /* kicca extras: inset wells + neumorphic shadows (light alphas per DESIGN.md) */
+    --well: #dde2e9;
+    --shadow-raised: 6px 6px 12px rgba(0, 0, 0, 0.18), -4px -4px 10px rgba(255, 255, 255, 0.9);
+    --shadow-inset: inset 3px 3px 8px rgba(0, 0, 0, 0.18), inset -2px -2px 6px rgba(255, 255, 255, 0.9);
+    --shadow-glow: 0 0 0 1px #0d9488, 4px 4px 10px rgba(13, 148, 136, 0.25);
+}
+
+/* Dark theme — DESIGN.md "Dark Hex" column (default) */
+.dark {
+    --background: #1c1f26;
+    --foreground: #edf0f4;
+    --card: #232733;
+    --card-foreground: #edf0f4;
+    --popover: #232733;
+    --popover-foreground: #edf0f4;
+    --primary: #2dd4bf;
+    --primary-foreground: #1c1f26;
+    --secondary: #2a2f3c;
+    --secondary-foreground: #edf0f4;
+    --muted: #2a2f3c;
+    --muted-foreground: #97a0af;
+    --accent: #2a2f3c;
+    --accent-foreground: #edf0f4;
+    --destructive: #f87171;
+    --border: #2e3442;
+    --input: #2e3442;
+    --ring: #2dd4bf;
+    --chart-1: #2dd4bf;
+    --chart-2: #60a5fa;
+    --chart-3: #fbbf24;
+    --chart-4: #c084fc;
+    --chart-5: #f87171;
+    --sidebar: #232733;
+    --sidebar-foreground: #edf0f4;
+    --sidebar-primary: #2dd4bf;
+    --sidebar-primary-foreground: #1c1f26;
+    --sidebar-accent: #2a2f3c;
+    --sidebar-accent-foreground: #edf0f4;
+    --sidebar-border: #2e3442;
+    --sidebar-ring: #2dd4bf;
+    --well: #1a1d24;
+    --shadow-raised: 6px 6px 12px rgba(0, 0, 0, 0.45), -4px -4px 10px rgba(255, 255, 255, 0.04);
+    --shadow-inset: inset 3px 3px 8px rgba(0, 0, 0, 0.45), inset -2px -2px 6px rgba(255, 255, 255, 0.05);
+    --shadow-glow: 0 0 0 1px #2dd4bf, 4px 4px 10px rgba(45, 212, 191, 0.25);
+}
+
+/* Neumorphic surface recipes — DESIGN.md canonical, one place, reused everywhere */
+@layer components {
+    .card-neu {
+        background: var(--card);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-raised);
+    }
+    .inset-neu {
+        background: var(--well);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-inset);
+    }
+    .btn-neu {
+        background: var(--card);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-raised);
+        transition: box-shadow 150ms ease;
+    }
+    .btn-neu:hover {
+        box-shadow: var(--shadow-raised), var(--shadow-glow);
+    }
+    .btn-neu:active,
+    .btn-neu[data-active] {
+        box-shadow: var(--shadow-inset), var(--shadow-glow);
+    }
+    .btn-neu:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
