@@ -80,6 +80,8 @@ export const api = {
 
   // Projects
   listProjects: () => req<{ data: Project[] }>('/projects'),
+  createProject: (body: { team_id: string; name: string; key: string; description?: string }) =>
+    req<Project>('/projects', { method: 'POST', body }),
   getProject: (id: string) => req<ProjectDetail>(`/projects/${id}`),
   patchProject: (
     id: string,

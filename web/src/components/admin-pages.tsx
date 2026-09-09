@@ -859,6 +859,172 @@ function TeamMembersDialog({
   )
 }
 
+// ------------------------------------------------ First project bootstrap
+
+// Chicken-and-egg guard (issue #16): with zero projects no board exists to
+// create anything from, so the admin empty state opens this directly.
+// Creates the team too when none exists yet.
+export function FirstProjectDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean
+  onClose: () => void
+  onCreated: (project: Project) => void
+}) {
+  const toast = useToast()
+  const [teams, setTeams] = useState<Team[] | null>(null)
+  const [teamId, setTeamId] = useState<string | null>(null) // '__new__' = create team
+  const [teamName, setTeamName] = useState('')
+  const [name, setName] = useState('')
+  const [key, setKey] = useState('')
+  const [errors, setErrors] = useState<FieldErrors>({})
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setTeams(null)
+      setTeamName('')
+      setName('')
+      setKey('')
+      setErrors({})
+      api.listTeams().then(
+        ({ data }) => {
+          setTeams(data)
+          setTeamId(data.length > 0 ? data[0].id : '__new__')
+        },
+        () => setTeams([]),
+      )
+    }
+  }, [open])
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const creatingTeam = teamId === '__new__'
+    const v = validateProjectGeneral({ name, key })
+    const teamErr = creatingTeam ? validateTeamName(teamName).name : undefined
+    if (teamErr) v.team = teamErr
+    setErrors(v)
+    if (Object.keys(v).length > 0) return
+    setBusy(true)
+    try {
+      const team = creatingTeam ? await api.createTeam(teamName.trim()) : null
+      const project = await api.createProject({
+        team_id: team ? team.id : teamId!,
+        name: name.trim(),
+        key: key.trim(),
+      })
+      toast('Project created')
+      onCreated(project)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setErrors({ key: 'A project with this key already exists.' })
+      } else {
+        setErrors({ form: 'Could not create project.' })
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create the first project</DialogTitle>
+          <DialogDescription>
+            Projects belong to a team — a new one is created if none exists yet.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-4" onSubmit={submit}>
+          {teams === null ? (
+            <RowSkeletons n={1} cols={1} />
+          ) : teams.length > 0 ? (
+            <Field label="Team" htmlFor="first-project-team">
+              <Select
+                id="first-project-team"
+                value={teamId}
+                onValueChange={(v) => setTeamId(v ?? '__new__')}
+              >
+                <SelectTrigger className="inset-neu w-full border-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {teams.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__new__">New team…</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : (
+            <Field label="Team" htmlFor="first-project-team" error={errors.team}>
+              <Input
+                id="first-project-team"
+                className="inset-neu"
+                aria-invalid={!!errors.team}
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                autoFocus
+              />
+            </Field>
+          )}
+          {teamId === '__new__' && (teams?.length ?? 0) > 0 && (
+            <Field label="New team name" htmlFor="first-project-team-name" error={errors.team}>
+              <Input
+                id="first-project-team-name"
+                className="inset-neu"
+                aria-invalid={!!errors.team}
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+              />
+            </Field>
+          )}
+          <Field label="Project name" htmlFor="first-project-name" error={errors.name}>
+            <Input
+              id="first-project-name"
+              className="inset-neu"
+              aria-invalid={!!errors.name}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </Field>
+          <Field label="Key" htmlFor="first-project-key" error={errors.key}>
+            <Input
+              id="first-project-key"
+              className="inset-neu font-mono uppercase"
+              aria-invalid={!!errors.key}
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              maxLength={10}
+            />
+          </Field>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            Task prefix — <span className="font-mono">{key || 'KEY'}-123</span>.
+          </p>
+          {errors.form && (
+            <p role="alert" className="text-sm text-destructive">
+              {errors.form}
+            </p>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Creating…' : 'Create project'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // -------------------------------------------------------- Project settings
 
 type SettingsTab = 'general' | 'members' | 'labels' | 'github'
