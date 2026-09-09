@@ -1,0 +1,106 @@
+// Typed API client — paths and shapes per docs/api-contract.md.
+// Cookie session: same-origin fetch sends kicca_session automatically.
+
+import type {
+  Comment,
+  Label,
+  MovePayload,
+  Paginated,
+  Priority,
+  Project,
+  ProjectDetail,
+  Status,
+  Task,
+  TaskCreate,
+  TaskPatch,
+  Team,
+  User,
+} from './types'
+
+export class ApiError extends Error {
+  status: number
+  code: string
+
+  constructor(status: number, code: string, message: string) {
+    super(message)
+    this.status = status
+    this.code = code
+  }
+}
+
+async function req<T>(
+  path: string,
+  init?: Omit<RequestInit, 'body'> & { body?: unknown },
+): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method: init?.method ?? 'GET',
+    headers: init?.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    signal: init?.signal,
+  })
+  if (res.status === 204) return undefined as T
+  const json = await res.json().catch(() => null)
+  if (!res.ok) {
+    const err = (json as { error?: { code?: string; message?: string } } | null)?.error
+    throw new ApiError(res.status, err?.code ?? 'unknown', err?.message ?? res.statusText)
+  }
+  return json as T
+}
+
+export const api = {
+  // Auth
+  login: (email: string, password: string) =>
+    req<{ user: User }>('/auth/login', { method: 'POST', body: { email, password } }),
+  logout: () => req<void>('/auth/logout', { method: 'POST' }),
+  me: (signal?: AbortSignal) => req<{ user: User }>('/auth/me', { signal }),
+
+  // Users (global admin)
+  listUsers: (page = 1) =>
+    req<Paginated<User>>(`/users?page=${page}`),
+
+  // Teams
+  listTeams: () => req<{ data: Team[] }>('/teams'),
+
+  // Projects
+  listProjects: () => req<{ data: Project[] }>('/projects'),
+  getProject: (id: string) => req<ProjectDetail>(`/projects/${id}`),
+  listLabels: (projectId: string) =>
+    req<{ data: Label[] }>(`/projects/${projectId}/labels`),
+
+  // Tasks
+  listTasks: (
+    projectId: string,
+    f: {
+      status?: Status
+      assignee_id?: string
+      priority?: Priority
+      label?: string
+      q?: string
+      page?: number
+      per_page?: number
+    } = {},
+  ) => {
+    const p = new URLSearchParams()
+    for (const [k, v] of Object.entries(f)) {
+      if (v !== undefined && v !== '') p.set(k, String(v))
+    }
+    const qs = p.toString()
+    return req<Paginated<Task>>(`/projects/${projectId}/tasks${qs ? `?${qs}` : ''}`)
+  },
+  getTask: (id: string) => req<Task>(`/tasks/${id}`),
+  createTask: (projectId: string, body: TaskCreate) =>
+    req<Task>(`/projects/${projectId}/tasks`, { method: 'POST', body }),
+  patchTask: (id: string, body: TaskPatch) =>
+    req<Task>(`/tasks/${id}`, { method: 'PATCH', body }),
+  deleteTask: (id: string) => req<void>(`/tasks/${id}`, { method: 'DELETE' }),
+  restoreTask: (id: string) =>
+    req<Task>(`/tasks/${id}/restore`, { method: 'POST' }),
+  moveTask: (id: string, body: MovePayload) =>
+    req<Task>(`/tasks/${id}/move`, { method: 'POST', body }),
+
+  // Comments
+  listComments: (taskId: string) =>
+    req<{ data: Comment[] }>(`/tasks/${taskId}/comments`),
+  addComment: (taskId: string, body: string) =>
+    req<Comment>(`/tasks/${taskId}/comments`, { method: 'POST', body: { body } }),
+}
