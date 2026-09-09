@@ -1,25 +1,23 @@
-// T1 stub — proves the DESIGN.md token pipeline (neumorphic surfaces, dark default).
-// Board, sidebar, and topbar arrive with later tickets.
+import { AuthProvider, useAuth } from '@/lib/auth'
+import { ToastProvider } from '@/lib/toast'
+import { LoginPage } from '@/components/login-page'
+import { Workspace } from '@/components/workspace'
+import { BoardSkeleton } from '@/components/skeletons'
+
+function AuthGate() {
+  const { state } = useAuth()
+  if (state.phase === 'booting') return <BoardSkeleton />
+  if (state.phase === 'anonymous') return <LoginPage />
+  return <Workspace />
+}
+
 function App() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-8">
-      <div className="card-neu w-full max-w-md p-8">
-        <h1 className="font-heading text-2xl font-semibold text-foreground">
-          kicca
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Internal task manager. Scaffold only — board lands in T4.
-        </p>
-        <div className="inset-neu mt-6 p-4">
-          <p className="font-mono text-xs text-muted-foreground">
-            KEY-123 · mono data style
-          </p>
-        </div>
-        <button type="button" className="btn-neu mt-6 px-4 py-2 text-sm font-medium text-foreground">
-          Neumorphic button
-        </button>
-      </div>
-    </main>
+    <AuthProvider>
+      <ToastProvider>
+        <AuthGate />
+      </ToastProvider>
+    </AuthProvider>
   )
 }
 
