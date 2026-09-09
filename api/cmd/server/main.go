@@ -18,7 +18,7 @@ func main() {
 		log.Fatalf("config: %v", err)
 	}
 
-	gdb, err := db.Open(cfg.DatabaseURL)
+	gdb, migrations, err := db.Open(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("db: %v", err)
 	}
@@ -26,16 +26,14 @@ func main() {
 		log.Fatalf("seed: %v", err)
 	}
 
-	ghEncKey, err := github.ParseEncKey(cfg.GHEncKey)
-	if err != nil {
-		log.Fatalf("GH_ENC_KEY: %v", err)
-	}
+	// validation already happened in config.Load; this just decodes the bytes
+	ghEncKey, _ := github.ParseEncKey(cfg.GHEncKey)
 
 	app := fiber.New()
 	app.Use(recover.New())
 	handlers.Register(app, gdb, cfg.JWTSecret, ghEncKey)
 
-	log.Printf("kicca api listening on :%s (%s)", cfg.Port, cfg)
+	log.Printf("kicca api listening on :%s (migrations applied: %d, %s)", cfg.Port, migrations, cfg)
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatalf("listen: %v", err)
 	}

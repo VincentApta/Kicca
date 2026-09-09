@@ -23,25 +23,31 @@ import (
 var migrationsFS embed.FS
 
 // Open connects via DATABASE_URL (gorm) and applies pending migrations.
-func Open(databaseURL string) (*gorm.DB, error) {
+// Returns the applied-migration count (== the sequential schema version;
+// golang-migrate stores only the current one).
+func Open(databaseURL string) (*gorm.DB, int, error) {
 	d, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
-		return nil, fmt.Errorf("migrations fs: %w", err)
+		return nil, 0, fmt.Errorf("migrations fs: %w", err)
 	}
 	m, err := migrate.NewWithSourceInstance("iofs", d, databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("migrate init: %w", err)
+		return nil, 0, fmt.Errorf("migrate init: %w", err)
 	}
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return nil, fmt.Errorf("migrate up: %w", err)
+		return nil, 0, fmt.Errorf("migrate up: %w", err)
+	}
+	version, _, err := m.Version()
+	if err != nil {
+		return nil, 0, fmt.Errorf("migrate version: %w", err)
 	}
 	m.Close()
 
 	gdb, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{TranslateError: true})
 	if err != nil {
-		return nil, fmt.Errorf("gorm open: %w", err)
+		return nil, 0, fmt.Errorf("gorm open: %w", err)
 	}
-	return gdb, nil
+	return gdb, int(version), nil
 }
 
 // SeedAdmin creates the initial admin from ADMIN_EMAIL/ADMIN_PASSWORD iff the

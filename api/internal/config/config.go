@@ -4,7 +4,12 @@ package config
 import (
 	"fmt"
 	"os"
+
+	"github.com/VincentApta/Kicca/api/internal/github"
 )
+
+// minJWTSecretLen: HS256 keys under 16 bytes are brute-forceable; refuse them.
+const minJWTSecretLen = 16
 
 // Config holds all runtime configuration for the api server.
 type Config struct {
@@ -30,7 +35,7 @@ func Load() (*Config, error) {
 		GitHubAPIBase: envOr("GITHUB_API_BASE", "https://api.github.com"),
 	}
 	// The server now opens the DB and signs JWTs at startup; refuse to boot
-	// without the essentials. ADMIN_*/GH_* stay optional (seed skips).
+	// without the essentials. ADMIN_* stays optional (seed skips).
 	for k, v := range map[string]string{
 		"DATABASE_URL": cfg.DatabaseURL,
 		"JWT_SECRET":   cfg.JWTSecret,
@@ -38,6 +43,14 @@ func Load() (*Config, error) {
 		if v == "" {
 			return nil, fmt.Errorf("%s is required", k)
 		}
+	}
+	if len(cfg.JWTSecret) < minJWTSecretLen {
+		return nil, fmt.Errorf("JWT_SECRET must be at least %d characters", minJWTSecretLen)
+	}
+	// GH_ENC_KEY is optional (nil disables GitHub), but a set value must be
+	// usable — fail now, not on the first PAT save.
+	if _, err := github.ParseEncKey(cfg.GHEncKey); err != nil {
+		return nil, fmt.Errorf("GH_ENC_KEY: %w", err)
 	}
 	return cfg, nil
 }
