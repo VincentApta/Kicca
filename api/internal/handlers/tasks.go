@@ -83,7 +83,8 @@ func toCommentJSONs(cms []models.Comment) []commentJSON {
 	return out
 }
 
-// taskJSON is the wire `task` shape. GhLink is a null placeholder until T7.
+// taskJSON is the wire `task` shape. GhLink is the GitHub issue link when
+// one exists, else null (populated in tasksJSON).
 type taskJSON struct {
 	ID          string      `json:"id"`
 	ProjectID   string      `json:"project_id"`
@@ -102,11 +103,12 @@ type taskJSON struct {
 	GhLink      interface{} `json:"gh_link"`
 }
 
-// tasksJSON assembles wire tasks, batching assignee + labels lookups so any
-// list costs two extra queries regardless of page size.
+// tasksJSON assembles wire tasks, batching assignee + labels + gh_link
+// lookups so any list costs three extra queries regardless of page size.
 func tasksJSON(gdb *gorm.DB, tasks []models.Task) []taskJSON {
 	assignees := map[string]userJSON{}
 	labels := map[string][]labelJSON{}
+	ghLinks := map[string]ghLinkJSON{}
 	if len(tasks) > 0 {
 		assigneeIDs := make([]string, 0, len(tasks))
 		taskIDs := make([]string, len(tasks))
@@ -139,6 +141,14 @@ func tasksJSON(gdb *gorm.DB, tasks []models.Task) []taskJSON {
 				labels[r.TaskID] = append(labels[r.TaskID], labelJSON{ID: r.ID, Name: r.Name, Color: r.Color})
 			}
 		}
+		var links []models.GitHubIssueLink
+		if err := gdb.Where("task_id IN ?", taskIDs).Find(&links).Error; err == nil {
+			for i := range links {
+				ghLinks[links[i].TaskID] = ghLinkJSON{
+					Repo: links[i].Repo, IssueNumber: links[i].IssueNumber, IssueURL: links[i].IssueURL,
+				}
+			}
+		}
 	}
 	out := make([]taskJSON, len(tasks))
 	for i := range tasks {
@@ -161,6 +171,9 @@ func tasksJSON(gdb *gorm.DB, tasks []models.Task) []taskJSON {
 		}
 		if l := labels[t.ID]; l != nil {
 			tj.Labels = l
+		}
+		if gl, ok := ghLinks[t.ID]; ok {
+			tj.GhLink = gl
 		}
 		out[i] = tj
 	}

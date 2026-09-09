@@ -21,10 +21,11 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { TaskKey } from './board/priority-dot'
 import { BOARD_STATUSES, PRIORITY_ORDER, STATUS_LABEL, taskKey } from '@/lib/board'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import type {
   Comment,
+  GhLink,
   Label as LabelT,
   Priority,
   ProjectMember,
@@ -41,6 +42,7 @@ export function TaskDrawer({
   onClose,
   onPatch,
   onTrash,
+  onGhLink,
 }: {
   task: Task | null
   members: ProjectMember[]
@@ -49,6 +51,7 @@ export function TaskDrawer({
   onClose: () => void
   onPatch: (id: string, patch: TaskPatch) => Promise<Task>
   onTrash: (id: string) => void
+  onGhLink: (id: string, link: GhLink) => void
 }) {
   return (
     <Sheet open={!!task} onOpenChange={(o) => !o && onClose()}>
@@ -67,6 +70,7 @@ export function TaskDrawer({
             onClose={onClose}
             onPatch={onPatch}
             onTrash={onTrash}
+            onGhLink={onGhLink}
           />
         ) : (
           <DrawerSkeleton />
@@ -84,6 +88,7 @@ function DrawerBody({
   onClose,
   onPatch,
   onTrash,
+  onGhLink,
 }: {
   task: Task
   members: ProjectMember[]
@@ -92,6 +97,7 @@ function DrawerBody({
   onClose: () => void
   onPatch: (id: string, patch: TaskPatch) => Promise<Task>
   onTrash: (id: string) => void
+  onGhLink: (id: string, link: GhLink) => void
 }) {
   const toast = useToast()
   const [title, setTitle] = useState(task.title)
@@ -100,6 +106,7 @@ function DrawerBody({
   const [comments, setComments] = useState<Comment[] | null>(null)
   const [commentBody, setCommentBody] = useState('')
   const [sending, setSending] = useState(false)
+  const [creatingGh, setCreatingGh] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -142,6 +149,25 @@ function DrawerBody({
       toast('Comment failed', 'error')
     } finally {
       setSending(false)
+    }
+  }
+
+  async function createGithubIssue() {
+    setCreatingGh(true)
+    try {
+      const link = await api.createGithubIssue(task.id)
+      onGhLink(task.id, link)
+      toast(`GitHub issue #${link.issue_number} created`)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 422) {
+        toast('Project has no GitHub configuration', 'error')
+      } else if (err instanceof ApiError && err.status === 409) {
+        toast('Task already has a GitHub issue', 'error')
+      } else {
+        toast('Could not create GitHub issue', 'error')
+      }
+    } finally {
+      setCreatingGh(false)
     }
   }
 
@@ -341,7 +367,7 @@ function DrawerBody({
           </div>
         </section>
 
-        {/* GH link / placeholder */}
+        {/* GH link — create when unlinked, badge links to the issue */}
         <section className="mt-6" aria-label="GitHub">
           {task.gh_link ? (
             <a
@@ -356,10 +382,15 @@ function DrawerBody({
               </span>
             </a>
           ) : (
-            /* placeholder — GH issue creation lands with the integration ticket */
-            <Button variant="ghost" size="sm" className="text-muted-foreground" disabled title="GitHub integration lands in a later ticket">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              disabled={creatingGh}
+              onClick={() => void createGithubIssue()}
+            >
               <GithubIcon strokeWidth={1.5} />
-              Create GitHub issue
+              {creatingGh ? 'Creating…' : 'Create GitHub issue'}
             </Button>
           )}
         </section>

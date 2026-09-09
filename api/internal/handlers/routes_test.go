@@ -36,15 +36,24 @@ func newTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		t.Fatalf("sqlite open: %v", err)
 	}
 	if err := gdb.AutoMigrate(&models.User{}, &models.Team{}, &models.TeamMember{}, &models.Project{}, &models.ProjectMember{},
-		&models.Task{}, &models.Label{}, &models.TaskLabel{}, &models.Comment{}); err != nil {
+		&models.Task{}, &models.Label{}, &models.TaskLabel{}, &models.Comment{}, &models.GitHubIssueLink{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 	if err := db.SeedAdmin(gdb, adminEmail, adminPass); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	app := fiber.New()
-	Register(app, gdb, testSecret)
+	Register(app, gdb, testSecret, &testGhEncKey)
 	return app, gdb
+}
+
+// testGhEncKey is a fixed AES-256 key standing in for GH_ENC_KEY.
+var testGhEncKey [32]byte
+
+func init() {
+	for i := range testGhEncKey {
+		testGhEncKey[i] = byte(i + 1)
+	}
 }
 
 // do fires a JSON request with an optional session cookie.

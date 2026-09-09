@@ -23,7 +23,7 @@ import {
   taskKey,
   type TaskFilters,
 } from '@/lib/board'
-import type { Label, Priority, Project, ProjectDetail, Status, Task, TaskPatch, User } from '@/lib/types'
+import type { GhLink, Label, Priority, Project, ProjectDetail, Status, Task, TaskPatch, User } from '@/lib/types'
 
 const PER_PAGE = 100
 
@@ -195,6 +195,10 @@ export function Workspace() {
         toast('Trash failed', 'error')
       },
     )
+  }
+
+  function handleGhLink(id: string, link: GhLink) {
+    setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, gh_link: link } : t)))
   }
 
   function handleRestore(id: string) {
@@ -383,6 +387,7 @@ export function Workspace() {
         onClose={() => setDrawerId(null)}
         onPatch={handlePatch}
         onTrash={handleTrash}
+        onGhLink={handleGhLink}
       />
     </ShellFrame>
   )

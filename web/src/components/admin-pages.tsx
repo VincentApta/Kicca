@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { GithubIcon } from '@/components/github-icon'
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ import {
   toMemberPayload,
   validateLabel,
   validateProjectGeneral,
+  validateProjectGithub,
   validateTeamName,
   validateUserCreate,
   validateUserEdit,
@@ -859,12 +861,13 @@ function TeamMembersDialog({
 
 // -------------------------------------------------------- Project settings
 
-type SettingsTab = 'general' | 'members' | 'labels'
+type SettingsTab = 'general' | 'members' | 'labels' | 'github'
 
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'members', label: 'Members' },
   { id: 'labels', label: 'Labels' },
+  { id: 'github', label: 'GitHub' },
 ]
 
 export function ProjectSettingsPage({
@@ -919,6 +922,9 @@ export function ProjectSettingsPage({
         )}
         {canManage && tab === 'labels' && (
           <LabelsTab projectId={project.id} labels={labels} onRefresh={onRefresh} />
+        )}
+        {canManage && tab === 'github' && (
+          <GithubTab key={detail?.id ?? 'loading'} detail={detail} onRefresh={onRefresh} />
         )}
       </div>
     </div>
@@ -1307,5 +1313,88 @@ function LabelsTab({
         ))}
       </div>
     </div>
+  )
+}
+
+function GithubTab({ detail, onRefresh }: { detail: ProjectDetail | null; onRefresh: () => void }) {
+  const toast = useToast()
+  const [repo, setRepo] = useState('')
+  const [token, setToken] = useState('')
+  const [errors, setErrors] = useState<FieldErrors>({})
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (detail) {
+      setRepo(detail.gh_repo ?? '')
+      setToken('')
+      setErrors({})
+    }
+  }, [detail])
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!detail) return
+    const v = validateProjectGithub({ repo, token, hasStoredToken: detail.gh_repo != null })
+    setErrors(v)
+    if (Object.keys(v).length > 0) return
+    setBusy(true)
+    try {
+      await api.saveProjectGithub(detail.id, { repo: repo.trim(), token: token.trim() })
+      toast('GitHub settings saved')
+      setToken('')
+      onRefresh()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 422) {
+        setErrors({ form: err.message })
+      } else {
+        setErrors({ form: 'Could not save GitHub settings.' })
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!detail) return <RowSkeletons n={4} cols={2} />
+
+  return (
+    <form className="flex max-w-lg flex-col gap-4" onSubmit={submit}>
+      <Field label="Repository" htmlFor="project-gh-repo" error={errors.repo}>
+        <Input
+          id="project-gh-repo"
+          className="inset-neu font-mono"
+          placeholder="owner/name"
+          aria-invalid={!!errors.repo}
+          value={repo}
+          onChange={(e) => setRepo(e.target.value)}
+          autoFocus
+        />
+      </Field>
+      <Field label="Personal access token" htmlFor="project-gh-token" error={errors.token}>
+        <Input
+          id="project-gh-token"
+          type="password"
+          className="inset-neu"
+          placeholder={detail.gh_repo ? 'Leave blank to keep the stored token' : 'Paste a personal access token'}
+          aria-invalid={!!errors.token}
+          autoComplete="new-password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+        />
+      </Field>
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <GithubIcon className="size-3.5" strokeWidth={1.5} />
+        The token is encrypted at rest and never displayed again — it only needs repo issue-write access.
+      </p>
+      {errors.form && (
+        <p role="alert" className="text-sm text-destructive">
+          {errors.form}
+        </p>
+      )}
+      <div className="flex justify-end">
+        <Button type="submit" disabled={busy}>
+          {busy ? 'Saving…' : 'Save GitHub settings'}
+        </Button>
+      </div>
+    </form>
   )
 }

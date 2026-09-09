@@ -52,6 +52,7 @@ export type ProjectMember = {
 export type ProjectDetail = Project & {
   my_role: ProjectRole | 'admin'
   members: ProjectMember[]
+  gh_repo: string | null // owner/name when the GitHub integration is configured
 }
 
 export type Label = { id: string; name: string; color: string }

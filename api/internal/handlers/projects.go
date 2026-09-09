@@ -179,6 +179,7 @@ func GetProject(gdb *gorm.DB) fiber.Handler {
 		return c.JSON(fiber.Map{
 			"id": p.ID, "team_id": p.TeamID, "name": p.Name, "key": p.Key,
 			"description": p.Description, "my_role": myRole, "members": members,
+			"gh_repo": p.GhRepo, // repo is not secret; the token never leaves the db
 		})
 	}
 }

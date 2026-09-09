@@ -7,6 +7,7 @@ import {
   toMemberPayload,
   validateLabel,
   validateProjectGeneral,
+  validateProjectGithub,
   validateTeamName,
   validateUserCreate,
   validateUserEdit,
@@ -149,5 +150,25 @@ describe('toMemberPayload', () => {
       { user_id: 'b', role: 'member' },
       { user_id: 'c', role: 'member' },
     ])
+  })
+})
+
+describe('validateProjectGithub', () => {
+  it('passes owner/name repo with a token', () => {
+    expect(validateProjectGithub({ repo: 'acme/app', token: 'ghp_x', hasStoredToken: false })).toEqual({})
+  })
+
+  it('allows a blank token when one is already stored', () => {
+    expect(validateProjectGithub({ repo: 'acme/app', token: '', hasStoredToken: true })).toEqual({})
+  })
+
+  it('requires a token on first save', () => {
+    expect(validateProjectGithub({ repo: 'acme/app', token: '', hasStoredToken: false }).token).toBeTruthy()
+  })
+
+  it('rejects repos without a single owner/name slash split', () => {
+    for (const repo of ['', 'acme', 'acme/app/extra', 'a b/c']) {
+      expect(validateProjectGithub({ repo, token: 'ghp_x', hasStoredToken: false }).repo).toBeTruthy()
+    }
   })
 })
