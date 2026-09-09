@@ -1,6 +1,6 @@
 // Route registration. Static routes are registered before any parametric
-// one so Fiber matches /api/health, /api/auth/* and /api/users before
-// /api/users/:id.
+// one so Fiber matches /api/health, /api/auth/*, /api/users, /api/teams and
+// /api/projects before their /:id subpaths.
 package handlers
 
 import (
@@ -30,4 +30,25 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string) {
 
 	// parametric — after the static /api/users routes above
 	users.Patch("/:id", PatchUser(gdb))
+
+	// teams — reads for any authed user (members see own), writes global admin
+	teams := api.Group("/teams", middleware.RequireAuth(jwtSecret, gdb))
+	teams.Get("/", ListTeams(gdb))
+	teamsAdmin := api.Group("/teams", middleware.RequireAdmin(jwtSecret, gdb))
+	teamsAdmin.Post("/", CreateTeam(gdb))
+	// parametric — after the static /api/teams route above
+	teamsAdmin.Patch("/:id", PatchTeam(gdb))
+	teamsAdmin.Delete("/:id", DeleteTeam(gdb))
+	teamsAdmin.Put("/:id/members", ReplaceTeamMembers(gdb))
+
+	// projects — visibility scoping (admin or member, else 404 no-leak) lives
+	// in the handlers
+	projects := api.Group("/projects", middleware.RequireAuth(jwtSecret, gdb))
+	projects.Get("/", ListProjects(gdb))
+	projects.Post("/", CreateProject(gdb))
+	// parametric — after the static /api/projects routes above
+	projects.Get("/:id", GetProject(gdb))
+	projects.Patch("/:id", PatchProject(gdb))
+	projects.Delete("/:id", DeleteProject(gdb))
+	projects.Put("/:id/members", ReplaceProjectMembers(gdb))
 }

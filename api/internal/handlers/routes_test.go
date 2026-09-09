@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/glebarez/sqlite"
+	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 
 	"github.com/VincentApta/Kicca/api/internal/db"
@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	testSecret   = "test-secret"
-	adminEmail   = "admin@example.com"
-	adminPass    = "admin-pass-1"
-	memberEmail  = "member@example.com"
-	memberPass   = "member-pass-1"
+	testSecret  = "test-secret"
+	adminEmail  = "admin@example.com"
+	adminPass   = "admin-pass-1"
+	memberEmail = "member@example.com"
+	memberPass  = "member-pass-1"
 )
 
 func newTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
@@ -35,7 +35,7 @@ func newTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	if err != nil {
 		t.Fatalf("sqlite open: %v", err)
 	}
-	if err := gdb.AutoMigrate(&models.User{}); err != nil {
+	if err := gdb.AutoMigrate(&models.User{}, &models.Team{}, &models.TeamMember{}, &models.Project{}, &models.ProjectMember{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 	if err := db.SeedAdmin(gdb, adminEmail, adminPass); err != nil {
