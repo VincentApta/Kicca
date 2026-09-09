@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RotateCcwIcon } from 'lucide-react'
+import { PlusIcon, RotateCcwIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sidebar, type View } from './sidebar'
 import { Topbar } from './topbar'
@@ -8,7 +8,7 @@ import { BoardView } from './board/board-view'
 import { ListView } from './list-view'
 import { CreateTaskDialog } from './create-task-dialog'
 import { TaskDrawer } from './task-drawer'
-import { ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
+import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
 import { BoardSkeleton, EmptyState, ListSkeleton } from './skeletons'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
@@ -46,6 +46,7 @@ export function Workspace() {
   const [collapsed, setCollapsed] = useState(false)
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [createStatus, setCreateStatus] = useState<Status | null>(null)
+  const [firstOpen, setFirstOpen] = useState(false)
 
   const me = state.phase === 'authenticated' ? state.user : null
   const project = projects?.find((p) => p.id === currentProjectId) ?? null
@@ -230,21 +231,60 @@ export function Workspace() {
     return state.phase === 'anonymous' ? <LoginPage /> : <BootSkeleton />
   }
 
+  function switchProject(id: string) {
+    setCurrentProjectId(id)
+    setDrawerId(null)
+    try {
+      localStorage.setItem('kicca-project', id)
+    } catch {
+      // ignore
+    }
+  }
+
   if (projects === null) return <BootSkeleton />
 
   if (projects.length === 0) {
+    // Bootstrap state (issue #16): admins get a create-first-project CTA and
+    // working admin nav; members can only be added by an admin.
+    const isAdmin = me.global_role === 'admin'
     return (
       <ShellFrame projects={projects} me={me} theme={theme} onToggleTheme={toggle} onLogout={logout} view={view}
-        onView={() => {}} filters={EMPTY_FILTERS} onFilters={() => {}} members={[]} labels={[]}
-        search="" onSearch={() => {}} project={null}
+        onView={(v) => setView(v)} filters={filters} onFilters={setFilters} members={[]} labels={[]}
+        search={search} onSearch={setSearch} project={null}
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
-        currentProjectId={null} onSwitchProject={() => {}}
-        onNavigate={() => {}} onMyTasks={() => {}} myTasksActive={false}
+        currentProjectId={null} onSwitchProject={switchProject}
+        onNavigate={setView} onMyTasks={() => setView('list')} myTasksActive={false}
         settingsAvailable={false}>
-        <EmptyState
-          title="No projects yet"
-          hint="Ask an admin to add you to a project — or create one once admin pages land."
-        />
+        {view === 'teams' ? (
+          <TeamsPage />
+        ) : view === 'users' ? (
+          <UsersPage />
+        ) : (
+          <EmptyState
+            title="No projects yet"
+            hint={isAdmin
+              ? 'Create the first team and project to get the board rolling.'
+              : 'Ask an admin to add you to a project.'}
+            action={isAdmin && (
+              <Button className="mt-3" onClick={() => setFirstOpen(true)}>
+                <PlusIcon strokeWidth={1.5} />
+                Create the first project
+              </Button>
+            )}
+          />
+        )}
+        {isAdmin && (
+          <FirstProjectDialog
+            open={firstOpen}
+            onClose={() => setFirstOpen(false)}
+            onCreated={(p) => {
+              setFirstOpen(false)
+              setProjects([p])
+              setCurrentProjectId(p.id)
+              setView('board')
+            }}
+          />
+        )}
       </ShellFrame>
     )
   }
@@ -276,15 +316,7 @@ export function Workspace() {
       collapsed={collapsed}
       onToggleCollapsed={() => setCollapsed((c) => !c)}
       currentProjectId={currentProjectId}
-      onSwitchProject={(id) => {
-        setCurrentProjectId(id)
-        setDrawerId(null)
-        try {
-          localStorage.setItem('kicca-project', id)
-        } catch {
-          // ignore
-        }
-      }}
+      onSwitchProject={switchProject}
       onNavigate={(v) => setView(v)}
       onMyTasks={() => {
         setView('list')
