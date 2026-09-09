@@ -3,6 +3,7 @@ import {
   ChevronsLeftIcon,
   FolderKanbanIcon,
   ListTodoIcon,
+  SettingsIcon,
   SquareKanbanIcon,
   Trash2Icon,
   UserCogIcon,
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import type { Project, User } from '@/lib/types'
 
-export type View = 'board' | 'list' | 'trash' | 'teams' | 'users'
+export type View = 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings'
 
 function NavButton({
   label,
@@ -60,6 +61,7 @@ export function Sidebar({
   onToggleCollapsed,
   me,
   myTasksActive,
+  settingsAvailable,
 }: {
   projects: Project[]
   currentProjectId: string | null
@@ -71,6 +73,7 @@ export function Sidebar({
   onToggleCollapsed: () => void
   me: User
   myTasksActive: boolean
+  settingsAvailable: boolean
 }) {
   const isAdmin = me.global_role === 'admin'
   const current = projects.find((p) => p.id === currentProjectId)
@@ -154,6 +157,17 @@ export function Sidebar({
           onClick={() => onNavigate('trash')}
         />
       </nav>
+
+      {/* project context — settings for global admins and project admins */}
+      {settingsAvailable && (
+        <NavButton
+          label="Project settings"
+          icon={<SettingsIcon className="size-4 shrink-0" strokeWidth={1.5} />}
+          active={view === 'settings'}
+          collapsed={collapsed}
+          onClick={() => onNavigate('settings')}
+        />
+      )}
 
       {isAdmin && (
         <div className="flex flex-col gap-1.5">

@@ -20,6 +20,20 @@ export type User = {
   global_role: GlobalRole
 }
 
+export type UserCreate = {
+  email: string
+  name: string
+  password: string
+  global_role: GlobalRole
+}
+
+export type UserPatch = Partial<{
+  name: string
+  global_role: GlobalRole
+  password: string
+  disabled: boolean
+}>
+
 export type Project = {
   id: string
   team_id: string

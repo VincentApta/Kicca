@@ -9,12 +9,16 @@ import type {
   Priority,
   Project,
   ProjectDetail,
+  ProjectMember,
+  ProjectRole,
   Status,
   Task,
   TaskCreate,
   TaskPatch,
   Team,
   User,
+  UserCreate,
+  UserPatch,
 } from './types'
 
 export class ApiError extends Error {
@@ -57,15 +61,43 @@ export const api = {
   // Users (global admin)
   listUsers: (page = 1) =>
     req<Paginated<User>>(`/users?page=${page}`),
+  createUser: (body: UserCreate) =>
+    req<User>('/users', { method: 'POST', body }),
+  patchUser: (id: string, body: UserPatch) =>
+    req<User>(`/users/${id}`, { method: 'PATCH', body }),
 
   // Teams
   listTeams: () => req<{ data: Team[] }>('/teams'),
+  createTeam: (name: string) =>
+    req<Team>('/teams', { method: 'POST', body: { name } }),
+  patchTeam: (id: string, name: string) =>
+    req<Team>(`/teams/${id}`, { method: 'PATCH', body: { name } }),
+  deleteTeam: (id: string) =>
+    req<void>(`/teams/${id}`, { method: 'DELETE' }),
+  replaceTeamMembers: (id: string, user_ids: string[]) =>
+    req<Team>(`/teams/${id}/members`, { method: 'PUT', body: { user_ids } }),
 
   // Projects
   listProjects: () => req<{ data: Project[] }>('/projects'),
   getProject: (id: string) => req<ProjectDetail>(`/projects/${id}`),
+  patchProject: (
+    id: string,
+    body: Partial<Pick<Project, 'name' | 'key' | 'description'>>,
+  ) => req<Project>(`/projects/${id}`, { method: 'PATCH', body }),
+  replaceProjectMembers: (
+    id: string,
+    members: { user_id: string; role: ProjectRole }[],
+  ) =>
+    req<{ members: ProjectMember[] }>(`/projects/${id}/members`, {
+      method: 'PUT',
+      body: { members },
+    }),
   listLabels: (projectId: string) =>
     req<{ data: Label[] }>(`/projects/${projectId}/labels`),
+  createLabel: (projectId: string, body: { name: string; color?: string }) =>
+    req<Label>(`/projects/${projectId}/labels`, { method: 'POST', body }),
+  deleteLabel: (id: string) =>
+    req<void>(`/labels/${id}`, { method: 'DELETE' }),
 
   // Tasks
   listTasks: (
