@@ -6,6 +6,7 @@ import (
 
 	"github.com/VincentApta/Kicca/api/internal/config"
 	"github.com/VincentApta/Kicca/api/internal/db"
+	"github.com/VincentApta/Kicca/api/internal/github"
 	"github.com/VincentApta/Kicca/api/internal/handlers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -25,9 +26,14 @@ func main() {
 		log.Fatalf("seed: %v", err)
 	}
 
+	ghEncKey, err := github.ParseEncKey(cfg.GHEncKey)
+	if err != nil {
+		log.Fatalf("GH_ENC_KEY: %v", err)
+	}
+
 	app := fiber.New()
 	app.Use(recover.New())
-	handlers.Register(app, gdb, cfg.JWTSecret)
+	handlers.Register(app, gdb, cfg.JWTSecret, ghEncKey)
 
 	log.Printf("kicca api listening on :%s (%s)", cfg.Port, cfg)
 	if err := app.Listen(":" + cfg.Port); err != nil {

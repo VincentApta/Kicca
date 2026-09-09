@@ -57,6 +57,21 @@ export function validateLabel(input: { name: string; color: string }): FieldErro
   return errors
 }
 
+// Backend: repo `^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`; a token is only needed
+// when none is stored yet (blank keeps the stored one).
+export const GH_REPO_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+
+export function validateProjectGithub(input: {
+  repo: string
+  token: string
+  hasStoredToken: boolean
+}): FieldErrors {
+  const errors: FieldErrors = {}
+  if (!GH_REPO_RE.test(input.repo.trim())) errors.repo = 'Use owner/name (e.g. acme/app).'
+  if (!input.token && !input.hasStoredToken) errors.token = 'Paste a personal access token.'
+  return errors
+}
+
 // PUT /projects/:id/members must keep ≥1 project_admin (server: 422).
 // soleProjectAdmin returns the only remaining admin's user_id, else null.
 export function soleProjectAdmin(

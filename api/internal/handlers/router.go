@@ -10,8 +10,9 @@ import (
 	"github.com/VincentApta/Kicca/api/internal/middleware"
 )
 
-// Register mounts all v1 routes. jwtSecret signs/verifies session cookies.
-func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string) {
+// Register mounts all v1 routes. jwtSecret signs/verifies session cookies;
+// ghEncKey (from GH_ENC_KEY) seals GitHub PATs — nil disables the feature.
+func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte) {
 	api := app.Group("/api")
 
 	// static
@@ -55,6 +56,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string) {
 	projects.Post("/:id/tasks", CreateTask(gdb))
 	projects.Get("/:id/labels", ListLabels(gdb))
 	projects.Post("/:id/labels", CreateLabel(gdb))
+	projects.Put("/:id/github", PutProjectGithub(gdb, ghEncKey))
 
 	// tasks — all parametric; visibility via the task's project (404 no-leak)
 	tasks := api.Group("/tasks", middleware.RequireAuth(jwtSecret, gdb))
@@ -65,6 +67,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string) {
 	tasks.Post("/:id/move", MoveTask(gdb))
 	tasks.Get("/:id/comments", ListComments(gdb))
 	tasks.Post("/:id/comments", CreateComment(gdb))
+	tasks.Post("/:id/github/issue", CreateTaskIssue(gdb, ghEncKey))
 
 	// labels — DELETE only (creation is per-project above)
 	labels := api.Group("/labels", middleware.RequireAuth(jwtSecret, gdb))

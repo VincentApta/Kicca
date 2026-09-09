@@ -3,6 +3,7 @@
 
 import type {
   Comment,
+  GhLink,
   Label,
   MovePayload,
   Paginated,
@@ -84,6 +85,8 @@ export const api = {
     id: string,
     body: Partial<Pick<Project, 'name' | 'key' | 'description'>>,
   ) => req<Project>(`/projects/${id}`, { method: 'PATCH', body }),
+  saveProjectGithub: (id: string, body: { repo: string; token?: string }) =>
+    req<{ repo: string }>(`/projects/${id}/github`, { method: 'PUT', body }),
   replaceProjectMembers: (
     id: string,
     members: { user_id: string; role: ProjectRole }[],
@@ -135,4 +138,8 @@ export const api = {
     req<{ data: Comment[] }>(`/tasks/${taskId}/comments`),
   addComment: (taskId: string, body: string) =>
     req<Comment>(`/tasks/${taskId}/comments`, { method: 'POST', body: { body } }),
+
+  // GitHub
+  createGithubIssue: (taskId: string) =>
+    req<NonNullable<GhLink>>(`/tasks/${taskId}/github/issue`, { method: 'POST', body: {} }),
 }
