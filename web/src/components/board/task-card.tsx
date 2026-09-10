@@ -47,7 +47,8 @@ export function TaskCard({
 /** DragOverlay copy — lifted look per DESIGN.md (scale 1.02 + stronger shadow). */
 export function TaskCardOverlay({ task, projectKey }: { task: Task; projectKey: string }) {
   return (
-    <div className="card-neu w-72 rotate-[1.2deg] scale-[1.02] p-3 opacity-95 shadow-[0_16px_32px_rgba(0,0,0,0.5)]">
+    <div className="card-neu w-72 rotate-[1.2deg] scale-[1.02] p-3 opacity-95"
+         style={{ boxShadow: 'var(--shadow-raised), 0 12px 28px rgba(0,0,0,0.35)' }}>
       <CardBody task={task} projectKey={projectKey} />
     </div>
   )

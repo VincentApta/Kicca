@@ -76,15 +76,14 @@ export default function MyTasksPage({ onSelectTask }: Props) {
           <li key={task.id}>
             <button
               onClick={() => onSelectTask(task.project_id, task.id)}
-              className="w-full text-left bg-card border border-border/60 rounded-lg px-4 py-3
-                         shadow-[inset_1px_1px_2px_rgba(255,255,255,.06),inset_-1px_-1px_2px_rgba(0,0,0,.18)]
-                         hover:border-accent/40 transition-colors cursor-pointer
+              className="w-full text-left card-neu px-4 py-3
+                         hover:shadow-[var(--shadow-raised),var(--shadow-glow)] transition-shadow cursor-pointer
                          flex items-start gap-3"
             >
               {/* project key mono chip */}
               {task.project_key && (
-                <span className="shrink-0 mt-0.5 inline-flex items-center rounded-md border border-border/50 bg-muted/40
-                                 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground/80 uppercase tracking-wider">
+                <span className="shrink-0 mt-0.5 inline-flex items-center rounded-md bg-secondary/60
+                                 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                   {task.project_key}
                 </span>
               )}

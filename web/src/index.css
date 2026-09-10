@@ -66,13 +66,13 @@
     --radius-4xl: calc(var(--radius-2xl) * 1.8);
 }
 
-/* Light theme — DESIGN.md "Light Hex" column */
+/* Light theme — neumorphism: page + cards same base. Shadows carry depth. */
 :root {
     --background: #e8ecf1;
     --foreground: #1b1f27;
-    --card: #f2f5f9;
+    --card: #e8ecf1;
     --card-foreground: #1b1f27;
-    --popover: #f2f5f9;
+    --popover: #e8ecf1;
     --popover-foreground: #1b1f27;
     --primary: #0d9488;
     --primary-foreground: #ffffff;
@@ -102,47 +102,56 @@
     --sidebar-ring: #0d9488;
     /* kicca extras: inset wells + neumorphic shadows (light alphas per DESIGN.md) */
     --well: #dde2e9;
-    --shadow-raised: 6px 6px 12px rgba(0, 0, 0, 0.18), -4px -4px 10px rgba(255, 255, 255, 0.9);
-    --shadow-inset: inset 3px 3px 8px rgba(0, 0, 0, 0.18), inset -2px -2px 6px rgba(255, 255, 255, 0.9);
+    /* Guide: light mode --light #FFFFFF, --dark #A3B1C6.
+       Never use raw black — soften to gray. */
+    --shadow-raised: -6px -6px 14px rgba(255, 255, 255, 0.85), 6px 6px 14px rgba(163, 177, 198, 0.45);
+    --shadow-inset: inset -4px -4px 10px rgba(255, 255, 255, 0.8), inset 4px 4px 10px rgba(163, 177, 198, 0.4);
     --shadow-glow: 0 0 0 1px #0d9488, 4px 4px 10px rgba(13, 148, 136, 0.25);
 }
 
-/* Dark theme — DESIGN.md "Dark Hex" column (default) */
+/* Dark theme — DESIGN.md "Dark Hex" column (default).
+   Neumorphism: page + cards = same base (#1c1f26). Depth from dual
+   shadows only — highlight top-left, shade bottom-right. Per the guide:
+   dark highlight is light gray (not white), dark shade is dark gray (not
+   black). The old --card (#232733) made cards brighter than page —
+   shadows did no work. Fixed: card = background, shadows carry depth. */
 .dark {
     --background: #1c1f26;
     --foreground: #edf0f4;
-    --card: #232733;
+    --card: #1c1f26;
     --card-foreground: #edf0f4;
-    --popover: #232733;
+    --popover: #1c1f26;
     --popover-foreground: #edf0f4;
     --primary: #2dd4bf;
     --primary-foreground: #1c1f26;
-    --secondary: #2a2f3c;
+    --secondary: #232733;
     --secondary-foreground: #edf0f4;
-    --muted: #2a2f3c;
+    --muted: #232733;
     --muted-foreground: #97a0af;
-    --accent: #2a2f3c;
+    --accent: #232733;
     --accent-foreground: #edf0f4;
     --destructive: #f87171;
-    --border: #2e3442;
-    --input: #2e3442;
+    --border: #232733;
+    --input: #232733;
     --ring: #2dd4bf;
     --chart-1: #2dd4bf;
     --chart-2: #60a5fa;
     --chart-3: #fbbf24;
     --chart-4: #c084fc;
     --chart-5: #f87171;
-    --sidebar: #232733;
+    --sidebar: #1c1f26;
     --sidebar-foreground: #edf0f4;
     --sidebar-primary: #2dd4bf;
     --sidebar-primary-foreground: #1c1f26;
-    --sidebar-accent: #2a2f3c;
+    --sidebar-accent: #232733;
     --sidebar-accent-foreground: #edf0f4;
-    --sidebar-border: #2e3442;
+    --sidebar-border: #232733;
     --sidebar-ring: #2dd4bf;
-    --well: #1a1d24;
-    --shadow-raised: 6px 6px 12px rgba(0, 0, 0, 0.45), -4px -4px 10px rgba(255, 255, 255, 0.04);
-    --shadow-inset: inset 3px 3px 8px rgba(0, 0, 0, 0.45), inset -2px -2px 6px rgba(255, 255, 255, 0.05);
+    --well: #181a20;
+    /* Guide: light top-left = slightly lighter than bg, dark bottom-right = slightly darker.
+       Never pure white/black in dark mode — kills the soft molding effect. */
+    --shadow-raised: -6px -6px 14px rgba(56, 62, 72, 0.35), 6px 6px 14px rgba(0, 0, 0, 0.5);
+    --shadow-inset: inset -4px -4px 10px rgba(56, 62, 72, 0.3), inset 4px 4px 10px rgba(0, 0, 0, 0.45);
     --shadow-glow: 0 0 0 1px #2dd4bf, 4px 4px 10px rgba(45, 212, 191, 0.25);
 }
 
