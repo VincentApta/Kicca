@@ -251,6 +251,17 @@ func TestProjectKeyValidation(t *testing.T) {
 		t.Fatalf("create: got %d %v", status, body)
 	}
 
+	// fresh project: creator is the sole member, as project_admin
+	_, detail, _ := do(t, app, http.MethodGet, "/api/projects/"+body["id"].(string), "", admin)
+	members := detail["members"].([]interface{})
+	if len(members) != 1 {
+		t.Fatalf("fresh project members: got %v, want 1", members)
+	}
+	m := members[0].(map[string]interface{})
+	if m["role"] != "project_admin" || m["email"] != adminEmail {
+		t.Fatalf("fresh project member: got %v, want creator as project_admin", m)
+	}
+
 	// duplicate key → 409
 	if status, body, _ := do(t, app, http.MethodPost, "/api/projects",
 		`{"team_id":"`+teamID+`","name":"Other","key":"KIC"}`, admin); status != http.StatusConflict || errCode(t, body) != "key_exists" {

@@ -148,7 +148,15 @@ func CreateProject(gdb *gorm.DB) fiber.Handler {
 		if req.Description != nil {
 			p.Description = *req.Description
 		}
-		if err := gdb.Create(p).Error; err != nil {
+		// Same transaction: creator becomes project_admin (domain rule) so
+		// fresh projects have members populated.
+		err := gdb.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(p).Error; err != nil {
+				return err
+			}
+			return tx.Create(&models.ProjectMember{ProjectID: p.ID, UserID: u.ID, Role: roleProjectAdmin}).Error
+		})
+		if err != nil {
 			if isUniqueViolation(err) {
 				return httpErr(c, fiber.StatusConflict, "key_exists", "a project with this key already exists")
 			}
