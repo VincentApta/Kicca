@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { PRIORITY_ORDER, STATUS_LABEL } from '@/lib/board'
+import { PRIORITY_ORDER } from '@/lib/board'
+import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import type { Label as LabelT, Priority, ProjectMember, Status, Task } from '@/lib/types'
 
 export function CreateTaskDialog({
@@ -54,6 +55,11 @@ export function CreateTaskDialog({
   const [labelIds, setLabelIds] = useState<string[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  const assigneeLabels = {
+    unassigned: 'Unassigned',
+    ...Object.fromEntries(members.map((m) => [m.user_id, m.name])),
+  }
 
   function reset() {
     setTitle('')
@@ -94,7 +100,7 @@ export function CreateTaskDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New task in {STATUS_LABEL[status]}</DialogTitle>
+          <DialogTitle>New task in {STATUS_LABELS[status]}</DialogTitle>
           <DialogDescription>Defaults to Medium priority.</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={submit}>
@@ -125,12 +131,14 @@ export function CreateTaskDialog({
               <Label htmlFor="task-priority">Priority</Label>
               <Select id="task-priority" value={priority} onValueChange={(v) => setPriority(v as Priority)}>
                 <SelectTrigger className="inset-neu w-full border-0">
-                  <SelectValue />
+                  <SelectValue>
+                    <SelectLabel value={priority} labelMap={PRIORITY_LABELS} />
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {PRIORITY_ORDER.map((p) => (
                     <SelectItem key={p} value={p}>
-                      {p[0].toUpperCase() + p.slice(1)}
+                      {PRIORITY_LABELS[p]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -144,7 +152,9 @@ export function CreateTaskDialog({
                 onValueChange={(v) => setAssigneeId(v ?? '')}
               >
                 <SelectTrigger className="inset-neu w-full border-0">
-                  <SelectValue placeholder="Unassigned" />
+                  <SelectValue placeholder="Unassigned">
+                    {assigneeId ? <SelectLabel value={assigneeId} labelMap={assigneeLabels} /> : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
