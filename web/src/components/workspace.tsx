@@ -9,6 +9,7 @@ import { ListView } from './list-view'
 import { CreateTaskDialog } from './create-task-dialog'
 import { TaskDrawer } from './task-drawer'
 import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
+import MyTasksPage from './my-tasks-page'
 import { ProjectsListPage } from './projects-list-page'
 import { BoardSkeleton, EmptyState, ListSkeleton } from './skeletons'
 import { useAuth } from '@/lib/auth'
@@ -254,7 +255,7 @@ export function Workspace() {
         search={search} onSearch={setSearch} project={null}
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
         currentProjectId={null} onSwitchProject={switchProject}
-        onNavigate={setView} onMyTasks={() => setView('list')} myTasksActive={false}
+        onNavigate={setView} onMyTasks={() => setView('mytasks')} myTasksActive={false}
         settingsAvailable={false}>
         {view === 'teams' ? (
           <TeamsPage />
@@ -319,11 +320,8 @@ export function Workspace() {
       currentProjectId={currentProjectId}
       onSwitchProject={switchProject}
       onNavigate={(v) => setView(v)}
-      onMyTasks={() => {
-        setView('list')
-        setFilters({ ...EMPTY_FILTERS, assignee_id: me.id })
-      }}
-      myTasksActive={view === 'list' && filters.assignee_id === me.id}
+      onMyTasks={() => setView('mytasks')}
+      myTasksActive={view === 'mytasks'}
       settingsAvailable={canManageProject}
     >
       {view === 'overview' ? (
@@ -357,6 +355,14 @@ export function Workspace() {
         <TeamsPage />
       ) : view === 'users' ? (
         <UsersPage />
+      ) : view === 'mytasks' ? (
+        <MyTasksPage
+          onSelectTask={(projectId: string, taskId: string) => {
+            setCurrentProjectId(projectId)
+            setView('board')
+            setTimeout(() => setDrawerId(taskId), 50)
+          }}
+        />
       ) : loading ? (
         view === 'list' || trashMode ? <ListSkeleton /> : <BoardSkeleton />
       ) : trashMode ? (

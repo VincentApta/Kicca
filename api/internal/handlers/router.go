@@ -59,8 +59,9 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	projects.Post("/:id/labels", CreateLabel(gdb))
 	projects.Put("/:id/github", PutProjectGithub(gdb, ghEncKey))
 
-	// tasks — all parametric; visibility via the task's project (404 no-leak)
+	// tasks — GET / must be registered BEFORE the parametric /:id route
 	tasks := api.Group("/tasks", middleware.RequireAuth(jwtSecret, gdb))
+	tasks.Get("/", MyTasks(gdb))
 	tasks.Get("/:id", GetTask(gdb))
 	tasks.Patch("/:id", PatchTask(gdb))
 	tasks.Delete("/:id", DeleteTask(gdb))

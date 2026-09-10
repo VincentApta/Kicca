@@ -88,6 +88,8 @@ func toCommentJSONs(cms []models.Comment) []commentJSON {
 type taskJSON struct {
 	ID          string      `json:"id"`
 	ProjectID   string      `json:"project_id"`
+	ProjectKey  string      `json:"project_key,omitempty"`
+	ProjectName string      `json:"project_name,omitempty"`
 	Number      int64       `json:"number"`
 	Title       string      `json:"title"`
 	Description string      `json:"description"`
@@ -295,6 +297,72 @@ func ListTasks(gdb *gorm.DB) fiber.Handler {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list tasks")
 		}
 		return c.JSON(fiber.Map{"data": tasksJSON(gdb, tasks), "page": page, "per_page": perPage, "total": total})
+	}
+}
+
+// MyTasks: GET /api/tasks?assignee_id=... — tasks across ALL visible
+// projects for the given assignee, joined with project key + name for the
+// global My Tasks page. Visibility: only tasks whose project is visible to
+// the caller (global admin, or member of that project) — no leak.
+func MyTasks(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		assignee := c.Query("assignee_id")
+		if assignee == "" {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_id is required")
+		}
+		if _, err := uuid.Parse(assignee); err != nil {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_id must be a uuid")
+		}
+		page := queryInt(c, "page", 1)
+		perPage := queryInt(c, "per_page", defaultPerPage)
+
+		// visible project ids for this user
+		visible := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
+		scope := func() *gorm.DB {
+			q := gdb.Unscoped().Model(&models.Task{}).
+				Where("assignee_id = ?", assignee).
+				Where("deleted_at IS NULL")
+			if u.GlobalRole != roleAdmin {
+				q = q.Where("project_id IN (?)", visible)
+			}
+			return q
+		}
+		var total int64
+		if err := scope().Count(&total).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not count tasks")
+		}
+		var tasks []models.Task
+		if err := scope().Order("created_at DESC").Limit(perPage).Offset((page - 1) * perPage).Find(&tasks).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list tasks")
+		}
+		out := tasksJSON(gdb, tasks)
+
+		// attach project key + name (batch by distinct project ids)
+		if len(tasks) > 0 {
+			projIDs := map[string]bool{}
+			for i := range tasks {
+				projIDs[tasks[i].ProjectID] = true
+			}
+			ids := make([]string, 0, len(projIDs))
+			for id := range projIDs {
+				ids = append(ids, id)
+			}
+			var projs []models.Project
+			if err := gdb.Where("id IN ?", ids).Find(&projs).Error; err == nil {
+				byID := map[string]models.Project{}
+				for i := range projs {
+					byID[projs[i].ID] = projs[i]
+				}
+				for i := range out {
+					if p, ok := byID[out[i].ProjectID]; ok {
+						out[i].ProjectKey = p.Key
+						out[i].ProjectName = p.Name
+					}
+				}
+			}
+		}
+		return c.JSON(fiber.Map{"data": out, "page": page, "per_page": perPage, "total": total})
 	}
 }
 
