@@ -2,6 +2,8 @@ import {
   ChevronLeftIcon,
   ChevronsLeftIcon,
   FolderKanbanIcon,
+  FoldersIcon,
+  LayoutDashboardIcon,
   ListTodoIcon,
   SettingsIcon,
   SquareKanbanIcon,
@@ -18,7 +20,7 @@ import {
 } from '@/components/ui/select'
 import type { Project, User } from '@/lib/types'
 
-export type View = 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings'
+export type View = 'overview' | 'projects' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings'
 
 function NavButton({
   label,
@@ -129,7 +131,7 @@ export function Sidebar({
           onValueChange={(v) => v !== null && onSwitchProject(v)}
         >
           <SelectTrigger className="inset-neu w-full border-0" aria-label="Project">
-            <SelectValue placeholder="Project" />
+            <SelectValue placeholder="Project">{current?.name}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {projects.map((p) => (
@@ -142,6 +144,20 @@ export function Sidebar({
       )}
 
       <nav className="flex flex-1 flex-col gap-1.5" aria-label="Main">
+        <NavButton
+          label="Dashboard"
+          icon={<LayoutDashboardIcon className="size-4 shrink-0" strokeWidth={1.5} />}
+          active={view === 'overview'}
+          collapsed={collapsed}
+          onClick={() => onNavigate('overview')}
+        />
+        <NavButton
+          label="Projects"
+          icon={<FoldersIcon className="size-4 shrink-0" strokeWidth={1.5} />}
+          active={view === 'projects'}
+          collapsed={collapsed}
+          onClick={() => onNavigate('projects')}
+        />
         <NavButton
           label="My Tasks"
           icon={<ListTodoIcon className="size-4 shrink-0" strokeWidth={1.5} />}

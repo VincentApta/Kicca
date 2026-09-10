@@ -9,6 +9,7 @@ import { ListView } from './list-view'
 import { CreateTaskDialog } from './create-task-dialog'
 import { TaskDrawer } from './task-drawer'
 import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
+import { ProjectsListPage } from './projects-list-page'
 import { BoardSkeleton, EmptyState, ListSkeleton } from './skeletons'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
@@ -325,7 +326,22 @@ export function Workspace() {
       myTasksActive={view === 'list' && filters.assignee_id === me.id}
       settingsAvailable={canManageProject}
     >
-      {view === 'settings' ? (
+      {view === 'overview' ? (
+        <div className="flex flex-1 items-center justify-center p-8">
+          <div className="card-neu max-w-lg p-8 text-center">
+            <h2 className="font-heading text-2xl font-semibold text-foreground mb-2">Overall Dashboard</h2>
+            <p className="text-sm text-muted-foreground">
+              Coming soon — cross-project overview of tasks, team activity, and workload.
+            </p>
+          </div>
+        </div>
+      ) : view === 'projects' ? (
+        <ProjectsListPage
+          projects={projects}
+          onSwitchProject={(id) => { setCurrentProjectId(id); setView('board') }}
+          onCreateProject={() => setFirstOpen(true)}
+        />
+      ) : view === 'settings' ? (
         project ? (
           <ProjectSettingsPage
             project={project}
