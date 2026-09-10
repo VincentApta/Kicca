@@ -43,7 +43,7 @@ export function BoardColumn({
       {/* inset well — the DESIGN.md signature: cards sit IN trays */}
       <div
         ref={setNodeRef}
-        className={`inset-neu flex min-h-40 flex-1 flex-col gap-2 p-2 transition-shadow ${
+        className={`inset-neu flex min-h-40 flex-1 flex-col gap-2 p-4 transition-shadow ${
           isOver ? 'shadow-[var(--shadow-inset),var(--shadow-glow)]' : ''
         }`}
       >

@@ -300,19 +300,18 @@ func ListTasks(gdb *gorm.DB) fiber.Handler {
 	}
 }
 
-// MyTasks: GET /api/tasks?assignee_id=... — tasks across ALL visible
-// projects for the given assignee, joined with project key + name for the
-// global My Tasks page. Visibility: only tasks whose project is visible to
-// the caller (global admin, or member of that project) — no leak.
+// MyTasks: GET /api/tasks[?assignee_id=...] — tasks across ALL visible
+// projects (optionally one assignee's), joined with project key + name.
+// Powers the global Dashboard (all members, filterable) and My Tasks page.
+// Visibility: only tasks whose project is visible to the caller.
 func MyTasks(gdb *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		u := currentUser(c)
 		assignee := c.Query("assignee_id")
-		if assignee == "" {
-			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_id is required")
-		}
-		if _, err := uuid.Parse(assignee); err != nil {
-			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_id must be a uuid")
+		if assignee != "" {
+			if _, err := uuid.Parse(assignee); err != nil {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_id must be a uuid")
+			}
 		}
 		page := queryInt(c, "page", 1)
 		perPage := queryInt(c, "per_page", defaultPerPage)
@@ -321,8 +320,10 @@ func MyTasks(gdb *gorm.DB) fiber.Handler {
 		visible := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
 		scope := func() *gorm.DB {
 			q := gdb.Unscoped().Model(&models.Task{}).
-				Where("assignee_id = ?", assignee).
 				Where("deleted_at IS NULL")
+			if assignee != "" {
+				q = q.Where("assignee_id = ?", assignee)
+			}
 			if u.GlobalRole != roleAdmin {
 				q = q.Where("project_id IN (?)", visible)
 			}

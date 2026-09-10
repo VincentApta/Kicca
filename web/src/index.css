@@ -102,6 +102,7 @@
     --sidebar-ring: #0d9488;
     /* kicca extras: inset wells + neumorphic shadows (light alphas per DESIGN.md) */
     --well: #dde2e9;
+    --scrollbar-thumb: #c7cfda;
     /* Guide: light mode --light #FFFFFF, --dark #A3B1C6.
        Never use raw black — soften to gray. */
     --shadow-raised: -6px -6px 14px rgba(255, 255, 255, 0.85), 6px 6px 14px rgba(163, 177, 198, 0.45);
@@ -148,6 +149,7 @@
     --sidebar-border: #232733;
     --sidebar-ring: #2dd4bf;
     --well: #181a20;
+    --scrollbar-thumb: #34383e;
     /* Guide: light top-left = slightly lighter than bg, dark bottom-right = slightly darker.
        Never pure white/black in dark mode — kills the soft molding effect. */
     --shadow-raised: -6px -6px 14px rgba(56, 62, 72, 0.35), 6px 6px 14px rgba(0, 0, 0, 0.5);
@@ -161,6 +163,9 @@
         background: var(--card);
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-raised);
+        /* Shadow extends ~6-14px past the box: 12px padding looks like 0px
+           against the visual edge. Usually 16px min so content clears it. */
+        padding: 1rem;
     }
     .inset-neu {
         background: var(--well);
@@ -184,6 +189,35 @@
         outline: 2px solid var(--ring);
         outline-offset: 1px;
     }
+}
+
+/* Neumorphic scrollbars — app-wide, replaces browser default.
+   Track = inset well, thumb = raised extrusion, matches card-neu language. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: var(--well);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-inset);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-raised);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    box-shadow: var(--shadow-raised), var(--shadow-glow);
+}
+::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

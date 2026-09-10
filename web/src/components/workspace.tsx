@@ -10,6 +10,7 @@ import { CreateTaskDialog } from './create-task-dialog'
 import { TaskDrawer } from './task-drawer'
 import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
 import MyTasksPage from './my-tasks-page'
+import { DashboardPage } from './dashboard-page'
 import { ProjectsListPage } from './projects-list-page'
 import { BoardSkeleton, EmptyState, ListSkeleton } from './skeletons'
 import { useAuth } from '@/lib/auth'
@@ -44,7 +45,7 @@ export function Workspace() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS)
   const [search, setSearch] = useState('')
-  const [view, setView] = useState<View>('board')
+  const [view, setView] = useState<View>('overview')
   const [collapsed, setCollapsed] = useState(false)
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [createStatus, setCreateStatus] = useState<Status | null>(null)
@@ -325,14 +326,18 @@ export function Workspace() {
       settingsAvailable={canManageProject}
     >
       {view === 'overview' ? (
-        <div className="flex flex-1 items-center justify-center p-8">
-          <div className="card-neu max-w-lg p-8 text-center">
-            <h2 className="font-heading text-2xl font-semibold text-foreground mb-2">Overall Dashboard</h2>
-            <p className="text-sm text-muted-foreground">
-              Coming soon — cross-project overview of tasks, team activity, and workload.
-            </p>
-          </div>
-        </div>
+        <DashboardPage
+          onSelectTask={(projectId, taskId) => {
+            if (!taskId) {
+              setCurrentProjectId(projectId)
+              setView('board')
+              return
+            }
+            setCurrentProjectId(projectId)
+            setView('board')
+            setTimeout(() => setDrawerId(taskId), 50)
+          }}
+        />
       ) : view === 'projects' ? (
         <ProjectsListPage
           projects={projects}
@@ -493,9 +498,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar
-        projects={shell.projects}
         currentProjectId={shell.currentProjectId}
-        onSwitchProject={shell.onSwitchProject}
         view={shell.view}
         onNavigate={shell.onNavigate}
         onMyTasks={shell.onMyTasks}

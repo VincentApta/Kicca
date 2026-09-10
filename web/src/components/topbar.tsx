@@ -88,13 +88,16 @@ export function Topbar({
   onLogout: () => void
 }) {
   const showBoardControls = view === 'board' || view === 'list' || view === 'trash'
+  const inProjectView = showBoardControls || view === 'settings'
   const nActive = showBoardControls ? filtersActive(filters) + (search.trim() ? 1 : 0) : 0
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/60 px-4">
       <div className="hidden min-w-40 flex-col lg:flex">
-        <span className="truncate text-sm font-medium text-foreground">{project?.name ?? 'kicca'}</span>
-        {project && (
+        <span className="truncate text-sm font-medium text-foreground">
+          {inProjectView && project ? project.name : 'kicca'}
+        </span>
+        {inProjectView && project && (
           <span className="font-mono text-xs text-muted-foreground">{project.key}</span>
         )}
       </div>

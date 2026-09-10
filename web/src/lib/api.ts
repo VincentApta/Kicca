@@ -106,9 +106,11 @@ export const api = {
   deleteLabel: (id: string) =>
     req<void>(`/labels/${id}`, { method: 'DELETE' }),
 
-  // My Tasks (global, cross-project)
-  myFetchMyTasks: (assigneeId: string, page = 1, perPage = 50) =>
-    req<Paginated<Task>>(`/tasks?assignee_id=${assigneeId}&page=${page}&per_page=${perPage}`),
+  // Tasks feed (global, cross-project). assigneeId optional — omit for all members.
+  myFetchMyTasks: (assigneeId?: string, page = 1, perPage = 100) =>
+    req<Paginated<Task>>(
+      `/tasks?page=${page}&per_page=${perPage}${assigneeId ? `&assignee_id=${assigneeId}` : ''}`,
+    ),
 
   // Tasks
   listTasks: (

@@ -64,21 +64,19 @@ export default function MyTasksPage({ onSelectTask }: Props) {
   }
 
   return (
-    <div className="px-3 py-4 space-y-4">
+    <div className="flex-1 overflow-auto p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-foreground">My Tasks</h1>
         <span className="text-xs text-muted-foreground/50">{tasks.length} task{tasks.length !== 1 && 's'}</span>
       </div>
 
       {/* simple neumorphic list rows — one per task, click → open in project board */}
-      <ul className="space-y-2">
+      <ul className="space-y-4">
         {tasks.map((task) => (
           <li key={task.id}>
             <button
               onClick={() => onSelectTask(task.project_id, task.id)}
-              className="w-full text-left card-neu px-4 py-3
-                         hover:shadow-[var(--shadow-raised),var(--shadow-glow)] transition-shadow cursor-pointer
-                         flex items-start gap-3"
+              className="w-full text-left card-neu hover:shadow-[var(--shadow-raised),var(--shadow-glow)] transition-shadow cursor-pointer flex items-start gap-3"
             >
               {/* project key mono chip */}
               {task.project_key && (

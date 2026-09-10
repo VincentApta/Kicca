@@ -89,7 +89,7 @@ function PageShell({
         </div>
         {actions}
       </div>
-      <div className="card-neu mt-6 p-4">{children}</div>
+      <div className="card-neu mt-6">{children}</div>
     </div>
   )
 }

@@ -1,4 +1,3 @@
-// Projects list page — visible to all members.  See also: admin-pages.tsx (admin views).
 import { Button } from '@/components/ui/button'
 import { PlusIcon, FolderKanbanIcon } from 'lucide-react'
 import type { Project } from '@/lib/types'
@@ -33,7 +32,7 @@ export function ProjectsListPage({
           <p className="text-sm text-muted-foreground">No projects yet. Create one to get started.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4">
           {projects.map((p) => (
             <button
               key={p.id}

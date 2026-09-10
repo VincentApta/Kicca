@@ -1,7 +1,6 @@
 import {
   ChevronLeftIcon,
   ChevronsLeftIcon,
-  FolderKanbanIcon,
   FoldersIcon,
   LayoutDashboardIcon,
   ListTodoIcon,
@@ -11,14 +10,7 @@ import {
   UserCogIcon,
   UsersIcon,
 } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import type { Project, User } from '@/lib/types'
+import type { User } from '@/lib/types'
 
 export type View = 'overview' | 'projects' | 'mytasks' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings'
 
@@ -53,9 +45,7 @@ function NavButton({
 }
 
 export function Sidebar({
-  projects,
   currentProjectId,
-  onSwitchProject,
   view,
   onNavigate,
   onMyTasks,
@@ -65,9 +55,7 @@ export function Sidebar({
   myTasksActive,
   settingsAvailable,
 }: {
-  projects: Project[]
   currentProjectId: string | null
-  onSwitchProject: (id: string) => void
   view: View
   onNavigate: (v: View) => void
   onMyTasks: () => void
@@ -78,7 +66,6 @@ export function Sidebar({
   settingsAvailable: boolean
 }) {
   const isAdmin = me.global_role === 'admin'
-  const current = projects.find((p) => p.id === currentProjectId)
 
   return (
     <aside
@@ -114,36 +101,18 @@ export function Sidebar({
         </button>
       )}
 
-      {/* project switcher */}
-      {collapsed ? (
-        <button
-          type="button"
-          aria-label={`Project: ${current?.name ?? 'none'}`}
-          title={current?.name}
-          onClick={() => onToggleCollapsed()}
-          className="btn-neu flex h-9 items-center justify-center text-muted-foreground"
-        >
-          <FolderKanbanIcon className="size-4" strokeWidth={1.5} />
-        </button>
-      ) : (
-        <Select
-          value={currentProjectId ?? null}
-          onValueChange={(v) => v !== null && onSwitchProject(v)}
-        >
-          <SelectTrigger className="inset-neu w-full border-0" aria-label="Project">
-            <SelectValue placeholder="Project">{current?.name}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* board nav — only when a project is open */}
+      {currentProjectId && (
+        <NavButton
+          label="Board"
+          icon={<SquareKanbanIcon className="size-4 shrink-0" strokeWidth={1.5} />}
+          active={view === 'board' || view === 'list' || view === 'trash'}
+          collapsed={collapsed}
+          onClick={() => onNavigate('board')}
+        />
       )}
 
-      <nav className="flex flex-1 flex-col gap-1.5" aria-label="Main">
+      <nav className="flex flex-1 flex-col gap-3" aria-label="Main">
         <NavButton
           label="Dashboard"
           icon={<LayoutDashboardIcon className="size-4 shrink-0" strokeWidth={1.5} />}
@@ -186,7 +155,7 @@ export function Sidebar({
       )}
 
       {isAdmin && (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-3">
           {!collapsed && (
             <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
               Admin
