@@ -780,7 +780,14 @@ function TeamMembersDialog({
       setUsers(null)
       setSelected(new Set())
       setQuery('')
-      loadAllUsers().then(setUsers, () => setUsers([]))
+      // Load all users AND current team members concurrently
+      Promise.all([
+        loadAllUsers(),
+        api.listTeamMembers(team.id).catch(() => ({ members: [] })),
+      ]).then(([allUsers, memberData]) => {
+        setUsers(allUsers)
+        setSelected(new Set(memberData.members.map((m) => m.user_id)))
+      }, () => setUsers([]))
     }
   }, [team])
 

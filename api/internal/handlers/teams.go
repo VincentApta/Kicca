@@ -230,6 +230,49 @@ func DeleteTeam(gdb *gorm.DB) fiber.Handler {
 	}
 }
 
+// teamMemberJSON mirrors the wire shape returned by ListTeamMembers and
+// PUT /teams/:id/members for consistency with the project members contract.
+type teamMemberJSON struct {
+	UserID string `json:"user_id" gorm:"column:user_id"`
+	Name   string `json:"name"    gorm:"column:name"`
+	Email  string `json:"email"   gorm:"column:email"`
+}
+
+// ListTeamMembers: GET /api/teams/:id/members — visible to any team member
+// and to global admins. 404 for non-members (no leak).
+func ListTeamMembers(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		if _, err := uuid.Parse(id); err != nil {
+			return httpErr(c, fiber.StatusBadRequest, "invalid_uuid", "team id must be a uuid")
+		}
+		var team models.Team
+		if err := gdb.First(&team, "id = ?", id).Error; err != nil {
+			return httpErr(c, fiber.StatusNotFound, "team_not_found", "no such team")
+		}
+		// visibility: global admin or team member
+		u := currentUser(c)
+		if u.GlobalRole != roleAdmin {
+			var cnt int64
+			gdb.Model(&models.TeamMember{}).Where("team_id = ? AND user_id = ?", team.ID, u.ID).Count(&cnt)
+			if cnt == 0 {
+				return httpErr(c, fiber.StatusNotFound, "team_not_found", "no such team")
+			}
+		}
+		var members []teamMemberJSON
+		err := gdb.Table("team_members").
+			Select("team_members.user_id, users.name, users.email").
+			Joins("JOIN users ON users.id = team_members.user_id").
+			Where("team_members.team_id = ?", team.ID).
+			Order("users.name").
+			Scan(&members).Error
+		if err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list members")
+		}
+		return c.JSON(fiber.Map{"members": members})
+	}
+}
+
 // ReplaceTeamMembers: PUT /api/teams/:id/members {user_ids} — full replace.
 // Every id must be a uuid of an existing user; empty list clears membership.
 func ReplaceTeamMembers(gdb *gorm.DB) fiber.Handler {

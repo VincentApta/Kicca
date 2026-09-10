@@ -35,6 +35,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	// teams — reads for any authed user (members see own), writes global admin
 	teams := api.Group("/teams", middleware.RequireAuth(jwtSecret, gdb))
 	teams.Get("/", ListTeams(gdb))
+	teams.Get("/:id/members", ListTeamMembers(gdb))
 	teamsAdmin := api.Group("/teams", middleware.RequireAdmin(jwtSecret, gdb))
 	teamsAdmin.Post("/", CreateTeam(gdb))
 	// parametric — after the static /api/teams route above

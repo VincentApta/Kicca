@@ -77,6 +77,8 @@ export const api = {
     req<void>(`/teams/${id}`, { method: 'DELETE' }),
   replaceTeamMembers: (id: string, user_ids: string[]) =>
     req<Team>(`/teams/${id}/members`, { method: 'PUT', body: { user_ids } }),
+  listTeamMembers: (id: string) =>
+    req<{ members: { user_id: string; name: string; email: string }[] }>(`/teams/${id}/members`),
 
   // Projects
   listProjects: () => req<{ data: Project[] }>('/projects'),

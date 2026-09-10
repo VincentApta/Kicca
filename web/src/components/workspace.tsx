@@ -437,6 +437,22 @@ export function Workspace() {
         onTrash={handleTrash}
         onGhLink={handleGhLink}
       />
+
+      {me?.global_role === 'admin' && (
+        <FirstProjectDialog
+          open={firstOpen}
+          onClose={() => setFirstOpen(false)}
+          onCreated={(p) => {
+            setFirstOpen(false)
+            setProjects((prev) => {
+              const list = prev ? [...prev, p] : [p]
+              return list
+            })
+            setCurrentProjectId(p.id)
+            setView('board')
+          }}
+        />
+      )}
     </ShellFrame>
   )
 }
