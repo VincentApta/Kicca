@@ -66,6 +66,8 @@ export type GhLink = {
 export type Task = {
   id: string
   project_id: string
+  project_key?: string
+  project_name?: string
   number: number
   title: string
   description: string

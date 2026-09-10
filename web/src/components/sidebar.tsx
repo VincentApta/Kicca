@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select'
 import type { Project, User } from '@/lib/types'
 
-export type View = 'overview' | 'projects' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings'
+export type View = 'overview' | 'projects' | 'mytasks' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings'
 
 function NavButton({
   label,
