@@ -42,6 +42,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError, api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
 import {
   canChangeMemberRole,
@@ -146,6 +147,11 @@ async function loadAllUsers(): Promise<User[]> {
   }
   return out
 }
+
+// Trigger display maps — Select.Value would render the raw stored value.
+const GLOBAL_ROLE_LABELS: Record<string, string> = { member: 'Member', admin: 'Admin' }
+const ACCOUNT_STATUS_LABELS: Record<string, string> = { active: 'Active', disabled: 'Disabled' }
+const PROJECT_ROLE_LABELS: Record<string, string> = { project_admin: 'Project admin', member: 'Member' }
 
 // ---------------------------------------------------------------- Users page
 
@@ -388,7 +394,9 @@ function CreateUserDialog({
           <Field label="Global role" htmlFor="new-user-role">
             <Select id="new-user-role" value={role} onValueChange={(v) => setRole(v as GlobalRole)}>
               <SelectTrigger className="inset-neu w-full border-0">
-                <SelectValue />
+                <SelectValue>
+                  <SelectLabel value={role} labelMap={GLOBAL_ROLE_LABELS} />
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="member">Member</SelectItem>
@@ -489,7 +497,9 @@ function EditUserDialog({
           <Field label="Global role" htmlFor="edit-user-role">
             <Select id="edit-user-role" value={role} onValueChange={(v) => setRole(v as GlobalRole)}>
               <SelectTrigger className="inset-neu w-full border-0">
-                <SelectValue />
+                <SelectValue>
+                  <SelectLabel value={role} labelMap={GLOBAL_ROLE_LABELS} />
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="member">Member</SelectItem>
@@ -509,7 +519,9 @@ function EditUserDialog({
               disabled={isSelf}
             >
               <SelectTrigger className="inset-neu w-full border-0">
-                <SelectValue />
+                <SelectValue>
+                  <SelectLabel value={status} labelMap={ACCOUNT_STATUS_LABELS} />
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="active">Active</SelectItem>
@@ -899,6 +911,11 @@ export function FirstProjectDialog({
     }
   }, [open])
 
+  const teamLabels = {
+    __new__: 'New team…',
+    ...Object.fromEntries((teams ?? []).map((t) => [t.id, t.name])),
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     const creatingTeam = teamId === '__new__'
@@ -948,7 +965,9 @@ export function FirstProjectDialog({
                 onValueChange={(v) => setTeamId(v ?? '__new__')}
               >
                 <SelectTrigger className="inset-neu w-full border-0">
-                  <SelectValue />
+                  <SelectValue>
+                    <SelectLabel value={teamId} labelMap={teamLabels} />
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {teams.map((t) => (
@@ -1317,7 +1336,12 @@ function MembersTab({ detail, onRefresh }: { detail: ProjectDetail; onRefresh: (
                       className="inset-neu border-0 text-xs"
                       aria-label={`Role for ${m.name}`}
                     >
-                      <SelectValue />
+                      <SelectValue>
+                        <SelectLabel
+                          value={m.role === 'admin' ? 'member' : m.role}
+                          labelMap={PROJECT_ROLE_LABELS}
+                        />
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="project_admin">Project admin</SelectItem>

@@ -17,7 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { BOARD_STATUSES, PRIORITY_ORDER, STATUS_LABEL, filtersActive, type TaskFilters } from '@/lib/board'
+import { BOARD_STATUSES, PRIORITY_ORDER, filtersActive, type TaskFilters } from '@/lib/board'
+import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import type { Label, ProjectMember, User } from '@/lib/types'
 import type { View } from './sidebar'
 
@@ -34,10 +35,16 @@ function FilterSelect({
   onChange: (v: string) => void
   disabled?: boolean
 }) {
+  const optionMap = {
+    all: `All ${label.toLowerCase()}`,
+    ...Object.fromEntries(options.map((o) => [o.value, o.label])),
+  }
   return (
     <Select value={value || null} onValueChange={(v) => onChange(v ?? '')} disabled={disabled}>
       <SelectTrigger size="sm" className="inset-neu border-0 text-xs" aria-label={label}>
-        <SelectValue placeholder={label} />
+        <SelectValue placeholder={label}>
+          {value ? <SelectLabel value={value} labelMap={optionMap} /> : null}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">{`All ${label.toLowerCase()}`}</SelectItem>
@@ -139,7 +146,7 @@ export function Topbar({
             <FilterSelect
               label="Priority"
               value={filters.priority}
-              options={PRIORITY_ORDER.map((p) => ({ value: p, label: p[0].toUpperCase() + p.slice(1) }))}
+              options={PRIORITY_ORDER.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
               onChange={(v) => onFilters({ ...filters, priority: v })}
             />
             <FilterSelect
@@ -151,7 +158,7 @@ export function Topbar({
             <FilterSelect
               label="Status"
               value={filters.status}
-              options={BOARD_STATUSES.map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
+              options={BOARD_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
               onChange={(v) => onFilters({ ...filters, status: v })}
             />
             {nActive > 0 && (

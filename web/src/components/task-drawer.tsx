@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { TaskKey } from './board/priority-dot'
-import { BOARD_STATUSES, PRIORITY_ORDER, STATUS_LABEL, taskKey } from '@/lib/board'
+import { BOARD_STATUSES, PRIORITY_ORDER, taskKey } from '@/lib/board'
+import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { ApiError, api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import type {
@@ -173,6 +174,11 @@ function DrawerBody({
 
   const labelIds = task.labels.map((l) => l.id)
 
+  const assigneeLabels = {
+    unassigned: 'Unassigned',
+    ...Object.fromEntries(members.map((m) => [m.user_id, m.name])),
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <SheetHeader className="flex-row items-center gap-3 border-b border-border py-3">
@@ -265,15 +271,17 @@ function DrawerBody({
             <Label className="text-xs text-muted-foreground">Status</Label>
             <Select
               value={task.status}
-              onValueChange={(v) => v && save({ status: v as Status }, `Moved to ${STATUS_LABEL[v as Status]}`)}
+              onValueChange={(v) => v && save({ status: v as Status }, `Moved to ${STATUS_LABELS[v as Status]}`)}
             >
               <SelectTrigger className="inset-neu w-full border-0">
-                <SelectValue />
+                <SelectValue>
+                  <SelectLabel value={task.status} labelMap={STATUS_LABELS} />
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {BOARD_STATUSES.map((s) => (
                   <SelectItem key={s} value={s}>
-                    {STATUS_LABEL[s]}
+                    {STATUS_LABELS[s]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -286,12 +294,14 @@ function DrawerBody({
               onValueChange={(v) => save({ priority: v as Priority }, 'Priority updated')}
             >
               <SelectTrigger className="inset-neu w-full border-0">
-                <SelectValue />
+                <SelectValue>
+                  <SelectLabel value={task.priority} labelMap={PRIORITY_LABELS} />
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {PRIORITY_ORDER.map((p) => (
                   <SelectItem key={p} value={p}>
-                    {p[0].toUpperCase() + p.slice(1)}
+                    {PRIORITY_LABELS[p]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -309,7 +319,11 @@ function DrawerBody({
               }
             >
               <SelectTrigger className="inset-neu w-full border-0">
-                <SelectValue placeholder="Unassigned" />
+                <SelectValue placeholder="Unassigned">
+                  {task.assignee ? (
+                    <SelectLabel value={task.assignee.id} labelMap={assigneeLabels} />
+                  ) : null}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
