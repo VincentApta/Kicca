@@ -169,3 +169,18 @@ export type ClientTicket = {
   created_at: string
   updated_at: string
 }
+
+/**
+ * Task attachments (#34). Team responses carry task_id/created_by; the
+ * client portal shape is minimal ({id, filename, content_type, size_bytes,
+ * created_at}) — those two stay absent there.
+ */
+export type Attachment = {
+  id: string
+  filename: string
+  content_type: string
+  size_bytes: number
+  created_at: string
+  task_id?: string
+  created_by?: string
+}
