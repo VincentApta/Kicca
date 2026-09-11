@@ -22,6 +22,10 @@ type Task struct {
 	CreatedBy   string     `gorm:"not null;type:uuid"`
 	DueDate     *time.Time `gorm:"type:date"`
 	Position    float64    `gorm:"not null;default:0"`
+	StartedAt   *time.Time // analytics: first move into in_progress/review
+	DoneAt      *time.Time // analytics: latest move into done (cleared on reopen)
+	Estimate    *int       // story points
+	Type        string     `gorm:"not null;default:'task'"` // task | bug | feature | chore
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DeletedAt   gorm.DeletedAt `gorm:"index"`
@@ -70,6 +74,28 @@ type Comment struct {
 func (c *Comment) BeforeCreate(_ *gorm.DB) error {
 	if c.ID == "" {
 		c.ID = uuid.NewString()
+	}
+	return nil
+}
+
+// TaskEvent: one row per status transition, NULL from_status = creation.
+type TaskEvent struct {
+	ID         string     `gorm:"primaryKey;type:uuid"`
+	TaskID     string     `gorm:"not null;index;type:uuid"`
+	ActorID    string     `gorm:"not null;type:uuid"`
+	FromStatus *string
+	ToStatus   string     `gorm:"not null"`
+	At         time.Time
+}
+
+// TableName pins the SQL-migration name (same reason as GitHubIssueLink:
+// GORM's default would not match migrations/000005_task_analytics.up.sql).
+func (TaskEvent) TableName() string { return "task_events" }
+
+// BeforeCreate fills a uuid v4 primary key (app-side, both dialects).
+func (e *TaskEvent) BeforeCreate(_ *gorm.DB) error {
+	if e.ID == "" {
+		e.ID = uuid.NewString()
 	}
 	return nil
 }

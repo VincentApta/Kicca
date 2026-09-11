@@ -37,7 +37,8 @@ func newTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 		t.Fatalf("sqlite open: %v", err)
 	}
 	if err := gdb.AutoMigrate(&models.User{}, &models.Team{}, &models.TeamMember{}, &models.Project{}, &models.ProjectMember{},
-		&models.Task{}, &models.Label{}, &models.TaskLabel{}, &models.Comment{}, &models.GitHubIssueLink{}); err != nil {
+		&models.Task{}, &models.Label{}, &models.TaskLabel{}, &models.Comment{}, &models.GitHubIssueLink{},
+		&models.TaskEvent{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 	if err := db.SeedAdmin(gdb, adminEmail, adminPass); err != nil {
