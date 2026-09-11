@@ -64,7 +64,7 @@ Entities, relationships, rules. See [[PRD]] for scope, [[api-contract]] for wire
 | timestamps | created_at, updated_at, deleted_at null | GORM soft delete = trash state |
 
 ### TaskEvent
-Analytics transition log — one row per status change (rule 8).
+Analytics transition log — one row per status change (rule 8). Also surfaced read-only as the activity timeline (#44): `GET /api/tasks/:id/events` (team, visibility like the task) and `GET /api/client/tickets/:id/events` (own tickets only; actor serialized as `{name}` — no email).
 | Field | Type | Notes |
 |---|---|---|
 | id | uuid PK | |

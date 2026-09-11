@@ -58,6 +58,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | GET | /projects/:id/tasks | `?status=&assignee_id=&priority=&label=&q=&page=` (default excludes trash) | `{data, page, per_page, total}` |
 | GET | /tasks | `?assignee_id=&page=&per_page=` (assignee optional) | global feed across visible projects; rows add `project_key`, `project_name` |
 | GET | /tasks/events | `?days=30&project_id=` (days capped 90) | `{days, data: [{date, counts: {status: n}}]}` end-of-day status counts (#26) |
+| GET | /tasks/:id/events | — | activity timeline (#44): `{data: [{id, from_status, to_status, actor: user, at}]}` newest-first, `from_status` null = creation; visibility-scoped like the task; read-only |
 | POST | /projects/:id/tasks | `{title, description?, status?, priority?, type?, estimate?, assignee_id?, due_date?, label_ids?[]}` | 201 task; defaults status=backlog priority=medium type=task |
 | GET | /tasks/:id | — | task + labels + gh_link + comments separate |
 | PATCH | /tasks/:id | any task field incl. `status`, `position`, `type`, `estimate` (null clears) | member+ |
@@ -87,6 +88,7 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 | POST | /client/tickets | `{project_id, title, description}` | 201 ticket → task status=inbox, created_by=client, per-project numbering; unlinked project 404 (no leak) |
 | GET | /client/tickets | ?page | own tickets (created_by=me, linked projects), newest-updated first |
 | GET/POST | /client/tickets/:id/attachments | multipart `file` | own tickets only; listing/streaming limited to attachments the client created |
+| GET | /client/tickets/:id/events | — | activity timeline (#44), own tickets only; actor = `{name}` — no email or role |
 
 `client ticket` = `{id, project_id, project_key, number, title, description, status, created_at, updated_at}` — assessment and other team-only fields are never serialized.
 

@@ -17,6 +17,7 @@ import type {
   ProjectRole,
   Status,
   Task,
+  TaskActivityEvent,
   TaskCreate,
   TaskEventsDay,
   TaskPatch,
@@ -143,6 +144,10 @@ export const api = {
       `/tasks/events?days=${days}${projectId ? `&project_id=${projectId}` : ''}`,
     ),
 
+  // Activity timeline (#44): a task's transition log, newest first.
+  taskEvents: (taskId: string) =>
+    req<{ data: TaskActivityEvent[] }>(`/tasks/${taskId}/events`),
+
   // Tasks
   listTasks: (
     projectId: string,
@@ -204,4 +209,6 @@ export const api = {
     req<{ data: Attachment[] }>(`/client/tickets/${ticketId}/attachments`),
   clientUploadTicketAttachment: (ticketId: string, file: File) =>
     req<Attachment>(`/client/tickets/${ticketId}/attachments`, { method: 'POST', body: fileForm(file) }),
+  clientTicketEvents: (ticketId: string) =>
+    req<{ data: TaskActivityEvent[] }>(`/client/tickets/${ticketId}/events`),
 }

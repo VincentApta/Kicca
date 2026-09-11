@@ -76,6 +76,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	tasks.Get("/", MyTasks(gdb))
 	tasks.Get("/events", TaskEvents(gdb))
 	tasks.Get("/:id", GetTask(gdb))
+	tasks.Get("/:id/events", TaskActivity(gdb))
 	tasks.Patch("/:id", PatchTask(gdb))
 	tasks.Delete("/:id", DeleteTask(gdb))
 	tasks.Post("/:id/restore", RestoreTask(gdb))
@@ -105,4 +106,5 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	client.Get("/tickets", ClientListTickets(gdb))
 	client.Post("/tickets/:id/attachments", ClientUploadTicketAttachment(gdb))
 	client.Get("/tickets/:id/attachments", ClientListTicketAttachments(gdb))
+	client.Get("/tickets/:id/events", ClientTicketEvents(gdb))
 }
