@@ -2,7 +2,9 @@
 -- Clients are registered users who submit tickets into a project's Inbox.
 -- They are NOT team members: they have no ProjectMember row, so every
 -- team-scoped query (board, members, labels, GitHub) naturally excludes them.
--- global_role gains 'client' (existing column, no schema change).
+-- global_role is a Postgres ENUM — extend it with 'client'.
+ALTER TYPE global_role ADD VALUE IF NOT EXISTS 'client';
+
 CREATE TABLE IF NOT EXISTS client_projects (
   client_id   uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   project_id  uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
