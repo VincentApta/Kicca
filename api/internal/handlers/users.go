@@ -19,13 +19,17 @@ const (
 	defaultPerPage = 50
 	roleAdmin      = "admin"
 	roleMember     = "member"
+	roleClient     = "client"
 )
 
+var validRoles = map[string]bool{roleAdmin: true, roleMember: true, roleClient: true}
+
 type createUserReq struct {
-	Email      string `json:"email"`
-	Name       string `json:"name"`
-	Password   string `json:"password"`
-	GlobalRole string `json:"global_role"`
+	Email      string   `json:"email"`
+	Name       string   `json:"name"`
+	Password   string   `json:"password"`
+	GlobalRole string   `json:"global_role"`
+	ProjectIDs []string `json:"project_ids"` // client only: projects they may submit tickets into
 }
 
 type patchUserReq struct {
@@ -71,8 +75,11 @@ func CreateUser(gdb *gorm.DB) fiber.Handler {
 		if !strings.Contains(req.Email, "@") || req.Name == "" || req.Password == "" {
 			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "email, name and password are required")
 		}
-		if req.GlobalRole != roleAdmin && req.GlobalRole != roleMember {
-			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "global_role must be admin or member")
+		if !validRoles[req.GlobalRole] {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "global_role must be admin, member or client")
+		}
+		if req.GlobalRole == roleClient && len(req.ProjectIDs) == 0 {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "a client must be linked to at least one project")
 		}
 		hash, err := auth.HashPassword(req.Password)
 		if err != nil {
@@ -84,6 +91,11 @@ func CreateUser(gdb *gorm.DB) fiber.Handler {
 				return httpErr(c, fiber.StatusConflict, "email_exists", "a user with this email already exists")
 			}
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create user")
+		}
+		if req.GlobalRole == roleClient {
+			if err := linkClientProjects(gdb, user.ID, req.ProjectIDs); err != nil {
+				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not link client projects")
+			}
 		}
 		return c.Status(fiber.StatusCreated).JSON(toUserJSON(user))
 	}
@@ -178,4 +190,28 @@ func isUniqueViolation(err error) bool {
 	}
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "duplicate key") || strings.Contains(s, "unique constraint")
+}
+
+// linkClientProjects inserts the client_projects rows for a newly created
+// client. Validates each project exists; rolls back on any failure.
+func linkClientProjects(gdb *gorm.DB, clientID string, projectIDs []string) error {
+	for _, pid := range projectIDs {
+		if _, err := uuid.Parse(pid); err != nil {
+			return err
+		}
+	}
+	var count int64
+	if err := gdb.Model(&models.Project{}).
+		Where("id IN ?", projectIDs).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count != int64(len(projectIDs)) {
+		return errors.New("one or more projects not found")
+	}
+	rows := make([]models.ClientProject, 0, len(projectIDs))
+	for _, pid := range projectIDs {
+		rows = append(rows, models.ClientProject{ClientID: clientID, ProjectID: pid})
+	}
+	return gdb.Create(&rows).Error
 }

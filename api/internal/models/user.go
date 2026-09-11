@@ -15,8 +15,18 @@ type User struct {
 	Email        string     `gorm:"uniqueIndex;not null"`
 	PasswordHash string     `gorm:"not null"`
 	Name         string     `gorm:"not null"`
-	GlobalRole   string     `gorm:"not null;default:member"` // admin | member
+	// GlobalRole: admin | member | client. Clients submit tickets into
+	// linked projects only — they have no ProjectMember row, so every
+	// team-scoped query naturally excludes them.
+	GlobalRole   string     `gorm:"not null;default:member"`
 	DisabledAt   *time.Time `gorm:"index"`
+}
+
+// ClientProject links a client to the projects they may submit tickets into.
+type ClientProject struct {
+	ClientID   string    `gorm:"primaryKey;type:uuid"`
+	ProjectID  string    `gorm:"primaryKey;type:uuid"`
+	CreatedAt  time.Time `gorm:"autoMigration:false"`
 }
 
 // BeforeCreate fills a uuid v4 primary key so both dialects (PG via migration
