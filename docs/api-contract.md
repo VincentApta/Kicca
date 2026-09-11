@@ -54,15 +54,18 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | Method | Path | Body/Query | Notes |
 |---|---|---|---|
 | GET | /projects/:id/tasks | `?status=&assignee_id=&priority=&label=&q=&page=` (default excludes trash) | `{data, page, per_page, total}` |
-| POST | /projects/:id/tasks | `{title, description?, status?, priority?, assignee_id?, due_date?, label_ids?[]}` | 201 task; defaults status=backlog priority=medium |
+| GET | /tasks | `?assignee_id=&page=&per_page=` (assignee optional) | global feed across visible projects; rows add `project_key`, `project_name` |
+| POST | /projects/:id/tasks | `{title, description?, status?, priority?, type?, estimate?, assignee_id?, due_date?, label_ids?[]}` | 201 task; defaults status=backlog priority=medium type=task |
 | GET | /tasks/:id | — | task + labels + gh_link + comments separate |
-| PATCH | /tasks/:id | any task field incl. `status`, `position` | member+ |
+| PATCH | /tasks/:id | any task field incl. `status`, `position`, `type`, `estimate` (null clears) | member+ |
 | DELETE | /tasks/:id | — | trash (soft); `?purge=1` admin hard delete |
 | POST | /tasks/:id/restore | — | back to backlog |
-| POST | /tasks/:id/move | `{status, before_task_id?, after_task_id?}` | server computes position |
+| POST | /tasks/:id/move | `{status, before_task_id?, after_task_id?}` | server computes position; stamps analytics (rule 8) |
 | GET/POST | /tasks/:id/comments | `{body}` | |
 
-`task` = `{id, project_id, number, title, description, status, priority, assignee?: user|null, labels: [{id,name,color}], due_date, position, created_by, created_at, updated_at, gh_link?: {repo, issue_number, issue_url}|null}`.
+`task` = `{id, project_id, number, title, description, status, priority, type, estimate, assignee?: user|null, labels: [{id,name,color}], due_date, position, started_at, done_at, created_by, created_at, updated_at, gh_link?: {repo, issue_number, issue_url}|null}`.
+
+Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `started_at`/`done_at` = server-stamped analytics timestamps (rule 8, not client-settable).
 
 ### GitHub
 | Method | Path | Notes |

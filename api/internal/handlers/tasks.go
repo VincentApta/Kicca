@@ -27,6 +27,11 @@ var taskStatuses = map[string]bool{
 
 var taskPriorities = map[string]bool{"urgent": true, "high": true, "medium": true, "low": true}
 
+var taskTypes = map[string]bool{"task": true, "bug": true, "feature": true, "chore": true}
+
+// startedStatuses: entering one of these stamps started_at (first touch wins).
+var startedStatuses = map[string]bool{"in_progress": true, "review": true}
+
 // errAnchorNotInColumn: move anchor is not a non-deleted task of the target
 // column in the same project → 422.
 var errAnchorNotInColumn = errors.New("anchor task not in target column")
@@ -36,6 +41,8 @@ type createTaskReq struct {
 	Description *string  `json:"description"`
 	Status      *string  `json:"status"`
 	Priority    *string  `json:"priority"`
+	Type        *string  `json:"type"`
+	Estimate    *int     `json:"estimate"`
 	AssigneeID  *string  `json:"assignee_id"`
 	DueDate     *string  `json:"due_date"`
 	LabelIDs    []string `json:"label_ids"`
@@ -46,6 +53,8 @@ type patchTaskReq struct {
 	Description *string         `json:"description"`
 	Status      *string         `json:"status"`
 	Priority    *string         `json:"priority"`
+	Type        *string         `json:"type"`
+	Estimate    json.RawMessage `json:"estimate"` // RawMessage: absent vs null (clear)
 	AssigneeID  json.RawMessage `json:"assignee_id"` // RawMessage: absent vs null (clear)
 	DueDate     json.RawMessage `json:"due_date"`    // ditto
 	Position    *float64        `json:"position"`
@@ -99,6 +108,10 @@ type taskJSON struct {
 	Labels      []labelJSON `json:"labels"`
 	DueDate     *string     `json:"due_date"`
 	Position    float64     `json:"position"`
+	StartedAt   *time.Time  `json:"started_at"`
+	DoneAt      *time.Time  `json:"done_at"`
+	Estimate    *int        `json:"estimate"`
+	Type        string      `json:"type"`
 	CreatedBy   string      `json:"created_by"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
@@ -159,6 +172,8 @@ func tasksJSON(gdb *gorm.DB, tasks []models.Task) []taskJSON {
 			ID: t.ID, ProjectID: t.ProjectID, Number: t.Number, Title: t.Title,
 			Description: t.Description, Status: t.Status, Priority: t.Priority,
 			Position: t.Position, CreatedBy: t.CreatedBy,
+			StartedAt: t.StartedAt, DoneAt: t.DoneAt, Estimate: t.Estimate,
+			Type: t.Type,
 			CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
 			Labels: []labelJSON{},
 		}
@@ -204,6 +219,23 @@ func loadVisibleTask(c *fiber.Ctx, gdb *gorm.DB, u *models.User, id string) (*mo
 func parseDate(s string) (time.Time, bool) {
 	t, err := time.Parse("2006-01-02", s)
 	return t, err == nil
+}
+
+// applyTransition stamps the analytics columns for a status change (rule 8):
+// started_at on first entry into in_progress/review (never overwritten),
+// done_at on entry into done, cleared on leaving done (re-done re-stamps).
+func applyTransition(updates map[string]interface{}, from *models.Task, to string) {
+	now := time.Now().UTC()
+	if startedStatuses[to] && from.StartedAt == nil {
+		updates["started_at"] = now
+	}
+	if to == "done" {
+		if from.DoneAt == nil {
+			updates["done_at"] = now
+		}
+	} else if from.Status == "done" {
+		updates["done_at"] = nil
+	}
 }
 
 // validateLabelIDs: uuids, no duplicates, all referencing labels of this
@@ -399,6 +431,16 @@ func CreateTask(gdb *gorm.DB) fiber.Handler {
 			}
 			priority = *req.Priority
 		}
+		taskType := "task"
+		if req.Type != nil && *req.Type != "" {
+			if !taskTypes[*req.Type] {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "type must be one of task|bug|feature|chore")
+			}
+			taskType = *req.Type
+		}
+		if req.Estimate != nil && *req.Estimate < 0 {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "estimate must be an integer >= 0")
+		}
 		var assignee *string
 		if req.AssigneeID != nil && *req.AssigneeID != "" {
 			if msg := validateUserIDs(gdb, []string{*req.AssigneeID}); msg != "" {
@@ -419,6 +461,7 @@ func CreateTask(gdb *gorm.DB) fiber.Handler {
 		}
 		task := &models.Task{
 			ProjectID: p.ID, Title: req.Title, Status: status, Priority: priority,
+			Type: taskType, Estimate: req.Estimate,
 			AssigneeID: assignee, CreatedBy: u.ID, DueDate: due,
 		}
 		if req.Description != nil {
@@ -435,6 +478,12 @@ func CreateTask(gdb *gorm.DB) fiber.Handler {
 			}
 			task.Position += positionGap
 			if err := tx.Create(task).Error; err != nil {
+				return err
+			}
+			// creation is the first status event (from NULL) — rule 8.
+			if err := tx.Create(&models.TaskEvent{
+				TaskID: task.ID, ActorID: u.ID, FromStatus: nil, ToStatus: status,
+			}).Error; err != nil {
 				return err
 			}
 			if len(req.LabelIDs) > 0 {
@@ -494,6 +543,9 @@ func PatchTask(gdb *gorm.DB) fiber.Handler {
 			if !taskStatuses[*req.Status] {
 				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "status must be a valid task status")
 			}
+			if *req.Status != t.Status {
+				applyTransition(updates, t, *req.Status)
+			}
 			updates["status"] = *req.Status
 		}
 		if req.Priority != nil {
@@ -501,6 +553,26 @@ func PatchTask(gdb *gorm.DB) fiber.Handler {
 				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "priority must be a valid task priority")
 			}
 			updates["priority"] = *req.Priority
+		}
+		if req.Type != nil && *req.Type != "" {
+			if !taskTypes[*req.Type] {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "type must be one of task|bug|feature|chore")
+			}
+			updates["type"] = *req.Type
+		}
+		if len(req.Estimate) > 0 {
+			if string(req.Estimate) == "null" {
+				updates["estimate"] = nil
+			} else {
+				var e int
+				if err := json.Unmarshal(req.Estimate, &e); err != nil {
+					return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "estimate must be an integer >= 0")
+				}
+				if e < 0 {
+					return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "estimate must be an integer >= 0")
+				}
+				updates["estimate"] = e
+			}
 		}
 		if len(req.AssigneeID) > 0 {
 			if string(req.AssigneeID) == "null" {
@@ -539,11 +611,23 @@ func PatchTask(gdb *gorm.DB) fiber.Handler {
 				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", msg)
 			}
 		}
+		newStatus := t.Status
+		if req.Status != nil {
+			newStatus = *req.Status
+		}
 		err := gdb.Transaction(func(tx *gorm.DB) error {
 			if len(updates) > 0 {
 				// Unscoped: patching a trashed task must not gain a
 				// deleted_at IS NULL predicate.
 				if err := tx.Unscoped().Model(&models.Task{}).Where("id = ?", t.ID).Updates(updates).Error; err != nil {
+					return err
+				}
+			}
+			if newStatus != t.Status {
+				from := t.Status
+				if err := tx.Create(&models.TaskEvent{
+					TaskID: t.ID, ActorID: u.ID, FromStatus: &from, ToStatus: newStatus,
+				}).Error; err != nil {
 					return err
 				}
 			}
@@ -724,8 +808,18 @@ func MoveTask(gdb *gorm.DB) fiber.Handler {
 				}
 				newPos = order[idx].Position // the moved task's slot after rebalancing
 			}
+			moveUpdates := map[string]interface{}{"status": req.Status, "position": newPos}
+			if req.Status != t.Status {
+				applyTransition(moveUpdates, t, req.Status)
+				from := t.Status
+				if err := tx.Create(&models.TaskEvent{
+					TaskID: t.ID, ActorID: u.ID, FromStatus: &from, ToStatus: req.Status,
+				}).Error; err != nil {
+					return err
+				}
+			}
 			if err := tx.Unscoped().Model(&models.Task{}).Where("id = ?", t.ID).
-				Updates(map[string]interface{}{"status": req.Status, "position": newPos}).Error; err != nil {
+				Updates(moveUpdates).Error; err != nil {
 				return err
 			}
 			if rebalance {

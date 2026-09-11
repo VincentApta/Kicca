@@ -49,12 +49,27 @@ Entities, relationships, rules. See [[PRD]] for scope, [[api-contract]] for wire
 | description | text | markdown |
 | status | enum(inbox, backlog, in_progress, review, done, blocked, trash) | |
 | priority | enum(urgent, high, medium, low) | default medium |
+| type | enum(task, bug, feature, chore) | default task — analytics: type mix |
+| estimate | int null | story points, >= 0 — analytics: burndown/velocity |
 | assignee_id | FK User null | 0..1 |
 | created_by | FK User | |
 | due_date | date null | |
 | position | float | order within column; fractional indexing on move |
 | labels | m:n Label | |
+| started_at | timestamp null | analytics: first entry into in_progress/review, never overwritten |
+| done_at | timestamp null | analytics: entry into done; cleared on reopen (rule 8) |
 | timestamps | created_at, updated_at, deleted_at null | GORM soft delete = trash state |
+
+### TaskEvent
+Analytics transition log — one row per status change (rule 8).
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| task_id | FK Task | cascade delete |
+| actor_id | FK User | who made the change |
+| from_status | string null | null = creation event |
+| to_status | string | |
+| at | timestamp | |
 
 ### Label
 | Field | Type | Notes |
@@ -120,3 +135,4 @@ erDiagram
 | Trash/restore tasks | ✅ | ✅ | ✅ |
 
 7. **Disabled user:** existing JWT rejected at middleware check (disabled_at lookup), sessions effectively dead; assigned tasks keep assignee (shows name, greyed).
+8. **Analytics stamps:** first entry into in_progress/review sets started_at (never overwritten); entry into done sets done_at; leaving done clears it (re-done re-stamps). Every status change (create counts, from NULL) writes a task_events row in the same transaction.
