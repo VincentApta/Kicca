@@ -38,21 +38,13 @@ func NewClient() *Client {
 	}
 }
 
-// uploadsBase mirrors base for the user-attachments host (tests point it at
-// their mock the same way as GITHUB_API_BASE).
-func uploadsBase() string {
-	if b := os.Getenv("GITHUB_UPLOADS_BASE"); b != "" {
-		return strings.TrimSuffix(b, "/")
-	}
-	return "https://uploads.github.com"
-}
-
 // UploadAttachment POSTs the file as multipart/form-data to
-// /user/attachments?name=<filename> and returns the permanent
-// browser_download_url (renders inline in issue bodies). GitHub requires
-// multipart + the name query param (raw body gets 400 "Multipart form data
-// required") and answers 202 Accepted. No retry: the caller skips the
-// attachment on failure rather than failing the issue.
+// /user/attachments?name=<filename> on the api base (api.github.com) and
+// returns the permanent browser_download_url (renders inline in issue
+// bodies). GitHub requires multipart + the name query param (raw body gets
+// 400 "Multipart form data required"; uploads.github.com always 422s) and
+// answers 202 Accepted. No retry: the caller skips the attachment on
+// failure rather than failing the issue.
 func (c *Client) UploadAttachment(token, filename, contentType string, body io.Reader) (string, error) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
@@ -71,7 +63,7 @@ func (c *Client) UploadAttachment(token, filename, contentType string, body io.R
 	// GitHub ignores the multipart part's Content-Type and sniffs bytes
 	// server-side; CreateFormFile sends application/octet-stream, which the
 	// endpoint accepts.
-	req, err := http.NewRequest(http.MethodPost, uploadsBase()+"/user/attachments?name="+name, &buf)
+	req, err := http.NewRequest(http.MethodPost, c.base+"/user/attachments?name="+name, &buf)
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
 	}
@@ -88,7 +80,7 @@ func (c *Client) UploadAttachment(token, filename, contentType string, body io.R
 		return "", fmt.Errorf("read github response: %v", err)
 	}
 	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("github uploads returned %d", resp.StatusCode)
+		return "", fmt.Errorf("github uploads returned %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
 	}
 	var out struct {
 		URL string `json:"browser_download_url"`
