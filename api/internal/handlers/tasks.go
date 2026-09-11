@@ -6,6 +6,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -332,8 +333,9 @@ func ListTasks(gdb *gorm.DB) fiber.Handler {
 	}
 }
 
-// MyTasks: GET /api/tasks[?assignee_id=...] — tasks across ALL visible
-// projects (optionally one assignee's), joined with project key + name.
+// MyTasks: GET /api/tasks[?assignee_id=...][?assignee_ids=a,b,c] — tasks
+// across ALL visible projects (optionally one assignee's, or comma-separated
+// list for team filtering), joined with project key + name.
 // Powers the global Dashboard (all members, filterable) and My Tasks page.
 // Visibility: only tasks whose project is visible to the caller.
 func MyTasks(gdb *gorm.DB) fiber.Handler {
@@ -345,6 +347,16 @@ func MyTasks(gdb *gorm.DB) fiber.Handler {
 				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_id must be a uuid")
 			}
 		}
+		assignees := strings.Split(c.Query("assignee_ids"), ",")
+		for _, a := range assignees {
+			if a == "" {
+				continue
+			}
+			if _, err := uuid.Parse(a); err != nil {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_ids must be uuids")
+			}
+		}
+		assignees = slices.DeleteFunc(assignees, func(s string) bool { return s == "" })
 		page := queryInt(c, "page", 1)
 		perPage := queryInt(c, "per_page", defaultPerPage)
 
@@ -355,6 +367,8 @@ func MyTasks(gdb *gorm.DB) fiber.Handler {
 				Where("deleted_at IS NULL")
 			if assignee != "" {
 				q = q.Where("assignee_id = ?", assignee)
+			} else if len(assignees) > 0 {
+				q = q.Where("assignee_id IN ?", assignees)
 			}
 			if u.GlobalRole != roleAdmin {
 				q = q.Where("project_id IN (?)", visible)

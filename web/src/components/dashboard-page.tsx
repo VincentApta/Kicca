@@ -100,26 +100,42 @@ function CfdChart({ data }: { data: { date: string; created: number; done: numbe
 export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: string, taskId: string) => void }) {
   const { state } = useAuth()
   const [projects, setProjects] = useState<Project[] | null>(null)
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([])
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [memberId, setMemberId] = useState<string>('all')
   const [projectId, setProjectId] = useState<string>('all')
+  const [teamId, setTeamId] = useState<string>('all')
+  const [teamUserIds, setTeamUserIds] = useState<string[]>([])
 
   const me = state.phase === 'authenticated' ? state.user : null
 
   useEffect(() => {
     if (state.phase !== 'authenticated') return
     api.listProjects().then((r) => setProjects(r.data)).catch(() => setError('Could not load projects'))
+    api.listTeams()
+      .then((r) => setTeams(r.data.map((t) => ({ id: t.id, name: t.name }))))
+      .catch(() => { /* teams optional */ })
   }, [state])
+
+  // fetch team member user ids when a team is selected
+  useEffect(() => {
+    if (state.phase !== 'authenticated' || teamId === 'all') {
+      setTeamUserIds([])
+      return
+    }
+    api.listTeamMembers(teamId).then((r) => setTeamUserIds(r.members.map((m) => m.user_id)))
+      .catch(() => setTeamUserIds([]))
+  }, [state, teamId])
 
   useEffect(() => {
     if (state.phase !== 'authenticated') return
     setTasks(null)
     api
-      .myFetchMyTasks(memberId === 'all' ? undefined : memberId)
+      .myFetchMyTasks(memberId === 'all' ? undefined : memberId, 1, 100, teamUserIds.length ? teamUserIds : undefined)
       .then((r) => setTasks(r.data))
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Could not load tasks'))
-  }, [state, memberId])
+  }, [state, memberId, teamUserIds])
 
   const allTasks = tasks ?? []
   const shown = useMemo(
@@ -184,6 +200,19 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="font-heading text-2xl font-semibold text-foreground">Dashboard</h1>
         <div className="ml-auto flex items-center gap-2">
+          {teams.length > 0 && (
+            <Select value={teamId} onValueChange={(v) => v !== null && setTeamId(v)}>
+              <SelectTrigger size="sm" className="inset-neu border-0 text-xs" aria-label="Team">
+                <SelectValue placeholder="Team">
+                  {teamId === 'all' ? 'All teams' : teams.find((t) => t.id === teamId)?.name ?? 'All teams'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All teams</SelectItem>
+                {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={memberId} onValueChange={(v) => v !== null && setMemberId(v)}>
             <SelectTrigger size="sm" className="inset-neu border-0 text-xs" aria-label="Member">
               <SelectValue placeholder="Member">

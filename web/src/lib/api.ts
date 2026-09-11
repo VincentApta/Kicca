@@ -108,9 +108,15 @@ export const api = {
     req<void>(`/labels/${id}`, { method: 'DELETE' }),
 
   // Tasks feed (global, cross-project). assigneeId optional — omit for all members.
-  myFetchMyTasks: (assigneeId?: string, page = 1, perPage = 100) =>
+  myFetchMyTasks: (assigneeId?: string, page = 1, perPage = 100, assigneeIds?: string[]) =>
     req<Paginated<Task>>(
-      `/tasks?page=${page}&per_page=${perPage}${assigneeId ? `&assignee_id=${assigneeId}` : ''}`,
+      `/tasks?page=${page}&per_page=${perPage}${
+        assigneeId
+          ? `&assignee_id=${assigneeId}`
+          : assigneeIds && assigneeIds.length
+            ? `&assignee_ids=${assigneeIds.join(',')}`
+            : ''
+      }`,
     ),
 
   // Analytics: per-day status counts over the last `days` days (capped 90),
