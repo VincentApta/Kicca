@@ -26,6 +26,9 @@ type Task struct {
 	DoneAt      *time.Time // analytics: latest move into done (cleared on reopen)
 	Estimate    *int       // story points
 	Type        string     `gorm:"not null;default:'task'"` // task | bug | feature | chore
+	// Assessment: triage note on an Inbox ticket, written by the assessor.
+	// GitHub issues are created from this (not description) when present.
+	Assessment string `gorm:"not null;default:''"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DeletedAt   gorm.DeletedAt `gorm:"index"`

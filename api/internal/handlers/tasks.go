@@ -52,10 +52,11 @@ type createTaskReq struct {
 type patchTaskReq struct {
 	Title       *string         `json:"title"`
 	Description *string         `json:"description"`
+	Assessment  *string         `json:"assessment"`
 	Status      *string         `json:"status"`
 	Priority    *string         `json:"priority"`
 	Type        *string         `json:"type"`
-	Estimate    json.RawMessage `json:"estimate"` // RawMessage: absent vs null (clear)
+	Estimate    json.RawMessage `json:"estimate"`    // RawMessage: absent vs null (clear)
 	AssigneeID  json.RawMessage `json:"assignee_id"` // RawMessage: absent vs null (clear)
 	DueDate     json.RawMessage `json:"due_date"`    // ditto
 	Position    *float64        `json:"position"`
@@ -113,6 +114,7 @@ type taskJSON struct {
 	DoneAt      *time.Time  `json:"done_at"`
 	Estimate    *int        `json:"estimate"`
 	Type        string      `json:"type"`
+	Assessment  string      `json:"assessment"`
 	CreatedBy   string      `json:"created_by"`
 	CreatedAt   time.Time   `json:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at"`
@@ -174,7 +176,7 @@ func tasksJSON(gdb *gorm.DB, tasks []models.Task) []taskJSON {
 			Description: t.Description, Status: t.Status, Priority: t.Priority,
 			Position: t.Position, CreatedBy: t.CreatedBy,
 			StartedAt: t.StartedAt, DoneAt: t.DoneAt, Estimate: t.Estimate,
-			Type: t.Type,
+			Type: t.Type, Assessment: t.Assessment,
 			CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
 			Labels: []labelJSON{},
 		}
@@ -552,6 +554,9 @@ func PatchTask(gdb *gorm.DB) fiber.Handler {
 		}
 		if req.Description != nil {
 			updates["description"] = *req.Description
+		}
+		if req.Assessment != nil {
+			updates["assessment"] = *req.Assessment
 		}
 		if req.Status != nil {
 			if !taskStatuses[*req.Status] {

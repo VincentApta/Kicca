@@ -76,6 +76,7 @@ export type Task = {
   priority: Priority
   type: TaskType
   estimate: number | null // story points, >= 0
+  assessment: string // triage note; used as GitHub issue body when non-empty
   assignee: User | null
   labels: Label[]
   due_date: string | null // YYYY-MM-DD
@@ -131,6 +132,7 @@ export type TaskCreate = {
 export type TaskPatch = Partial<{
   title: string
   description: string
+  assessment: string
   status: Status
   priority: Priority
   type: TaskType

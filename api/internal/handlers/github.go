@@ -114,7 +114,15 @@ func CreateTaskIssue(gdb *gorm.DB, encKey *[32]byte) fiber.Handler {
 	}
 }
 
-// issueBody: task description plus a small footer pointing back at the task.
+// issueBody: the assessment (triage conclusion) is the issue body; the
+// original ticket description is preserved as quoted context. Falls back to
+// description alone when no assessment exists yet.
 func issueBody(projectKey string, t *models.Task) string {
-	return t.Description + "\n\n---\n\nCreated from kicca task " + projectKey + "-" + strconv.FormatInt(t.Number, 10)
+	ref := "\n\n---\n\nCreated from kicca task " + projectKey + "-" + strconv.FormatInt(t.Number, 10)
+	if strings.TrimSpace(t.Assessment) != "" {
+		return t.Assessment +
+			"\n\n---\n\n**Original ticket**\n\n> " +
+			strings.ReplaceAll(t.Description, "\n", "\n> ") + ref
+	}
+	return t.Description + ref
 }

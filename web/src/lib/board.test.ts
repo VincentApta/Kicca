@@ -22,6 +22,7 @@ function task(partial: Partial<Task> & { id: string }): Task {
     priority: 'medium',
     type: 'task',
     estimate: null,
+    assessment: '',
     started_at: null,
     done_at: null,
     assignee: null,

@@ -104,6 +104,8 @@ function DrawerBody({
   const [title, setTitle] = useState(task.title)
   const [editingDesc, setEditingDesc] = useState(false)
   const [desc, setDesc] = useState(task.description)
+  const [editingAssess, setEditingAssess] = useState(false)
+  const [assess, setAssess] = useState(task.assessment)
   const [comments, setComments] = useState<Comment[] | null>(null)
   const [commentBody, setCommentBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -261,6 +263,67 @@ function DrawerBody({
               className="mt-1 w-full rounded-lg py-3 text-left text-sm text-muted-foreground hover:text-foreground"
             >
               Add a description…
+            </button>
+          )}
+        </section>
+
+        {/* assessment: triage note — becomes the GitHub issue body */}
+        <section className="mt-4" aria-label="Assessment">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Assessment
+            </h3>
+            {!editingAssess && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAssess(task.assessment)
+                  setEditingAssess(true)
+                }}
+                className="flex items-center gap-1 rounded-md p-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <PencilIcon className="size-3" strokeWidth={1.5} /> Edit
+              </button>
+            )}
+          </div>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Triage conclusion — used as the GitHub issue body (description kept as context) when creating an issue.
+          </p>
+          {editingAssess ? (
+            <div className="mt-2 flex flex-col gap-2">
+              <Textarea
+                className="inset-neu min-h-32"
+                value={assess}
+                onChange={(e) => setAssess(e.target.value)}
+                placeholder="Markdown supported"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setEditingAssess(false)
+                    if (assess !== task.assessment) void save({ assessment: assess }, 'Assessment saved')
+                  }}
+                >
+                  <CheckIcon strokeWidth={1.5} /> Save
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditingAssess(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : task.assessment ? (
+            <div className="prose-neutral mt-1 text-sm leading-relaxed text-foreground [&_a]:text-primary [&_code]:rounded [&_code]:bg-secondary [&_code]:px-1 [&_code]:font-mono [&_code]:text-xs [&_h1]:mt-3 [&_h1]:text-base [&_h2]:mt-3 [&_h2]:text-sm [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_pre]:bg-secondary [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-xs [&_ul]:list-disc [&_ul]:pl-5">
+              <Markdown>{task.assessment}</Markdown>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingAssess(true)}
+              className="mt-1 w-full rounded-lg py-3 text-left text-sm text-muted-foreground hover:text-foreground"
+            >
+              Add an assessment…
             </button>
           )}
         </section>
