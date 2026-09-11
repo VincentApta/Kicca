@@ -73,23 +73,39 @@ type createCommentReq struct {
 	Body string `json:"body"`
 }
 
-// commentJSON is the wire `comment` shape.
+// commentJSON is the wire `comment` shape. Author resolves the user row so
+// client-portal authors (not in any members list) still show their name (#43).
 type commentJSON struct {
 	ID        string    `json:"id"`
 	TaskID    string    `json:"task_id"`
 	UserID    string    `json:"user_id"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"created_at"`
+	Author    string    `json:"author"`
 }
 
-func toCommentJSON(cm *models.Comment) commentJSON {
-	return commentJSON{ID: cm.ID, TaskID: cm.TaskID, UserID: cm.UserID, Body: cm.Body, CreatedAt: cm.CreatedAt}
+func toCommentJSON(cm *models.Comment, author string) commentJSON {
+	return commentJSON{ID: cm.ID, TaskID: cm.TaskID, UserID: cm.UserID, Body: cm.Body, CreatedAt: cm.CreatedAt, Author: author}
 }
 
-func toCommentJSONs(cms []models.Comment) []commentJSON {
+// toCommentJSONs assembles wire comments, batch-loading author names.
+func toCommentJSONs(gdb *gorm.DB, cms []models.Comment) []commentJSON {
+	names := map[string]string{}
+	if len(cms) > 0 {
+		ids := make([]string, 0, len(cms))
+		for i := range cms {
+			ids = append(ids, cms[i].UserID)
+		}
+		var rows []struct{ ID, Name string }
+		if err := gdb.Model(&models.User{}).Select("id, name").Where("id IN ?", ids).Scan(&rows).Error; err == nil {
+			for _, r := range rows {
+				names[r.ID] = r.Name
+			}
+		}
+	}
 	out := make([]commentJSON, len(cms))
 	for i := range cms {
-		out[i] = toCommentJSON(&cms[i])
+		out[i] = toCommentJSON(&cms[i], names[cms[i].UserID])
 	}
 	return out
 }
@@ -880,7 +896,7 @@ func ListComments(gdb *gorm.DB) fiber.Handler {
 		if err := gdb.Where("task_id = ?", t.ID).Order("created_at").Find(&comments).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list comments")
 		}
-		return c.JSON(fiber.Map{"data": toCommentJSONs(comments)})
+		return c.JSON(fiber.Map{"data": toCommentJSONs(gdb, comments)})
 	}
 }
 
@@ -903,6 +919,6 @@ func CreateComment(gdb *gorm.DB) fiber.Handler {
 		if err := gdb.Create(cm).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create comment")
 		}
-		return c.Status(fiber.StatusCreated).JSON(toCommentJSON(cm))
+		return c.Status(fiber.StatusCreated).JSON(toCommentJSON(cm, u.Name))
 	}
 }

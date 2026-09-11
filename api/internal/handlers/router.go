@@ -105,4 +105,6 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	client.Get("/tickets", ClientListTickets(gdb))
 	client.Post("/tickets/:id/attachments", ClientUploadTicketAttachment(gdb))
 	client.Get("/tickets/:id/attachments", ClientListTicketAttachments(gdb))
+	client.Get("/tickets/:id/comments", ClientListTicketComments(gdb))
+	client.Post("/tickets/:id/comments", ClientCreateTicketComment(gdb))
 }

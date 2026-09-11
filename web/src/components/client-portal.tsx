@@ -3,7 +3,7 @@
 // team nav; assessment and other team-only fields are never rendered (the
 // API doesn't even send them).
 import { useEffect, useState, type FormEvent } from 'react'
-import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SunIcon, TicketIcon } from 'lucide-react'
+import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,7 +28,7 @@ import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
 import { STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
-import type { Attachment, ClientProjectRef, ClientTicket, Status } from '@/lib/types'
+import type { Attachment, ClientComment, ClientProjectRef, ClientTicket, Status } from '@/lib/types'
 
 // Same palette as my-tasks-page pills.
 const STATUS_COLORS: Record<string, string> = {
@@ -72,6 +72,9 @@ export function ClientPortal() {
   const [tickets, setTickets] = useState<ClientTicket[] | null>(null)
   const [detail, setDetail] = useState<ClientTicket | null>(null)
   const [detailAtts, setDetailAtts] = useState<Attachment[] | null>(null)
+  const [detailComments, setDetailComments] = useState<ClientComment[] | null>(null)
+  const [commentBody, setCommentBody] = useState('')
+  const [sending, setSending] = useState(false)
 
   // submit form
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -100,17 +103,40 @@ export function ClientPortal() {
   }, [])
 
   // ticket detail loads its attachments (client-created ones only — the
-  // server filters to what this client may stream)
+  // server filters to what this client may stream) and the comment thread
+  // (#43: team comments arrive with the author name only)
   useEffect(() => {
     if (!detail) {
       setDetailAtts(null)
+      setDetailComments(null)
+      setCommentBody('')
       return
     }
     api.clientListTicketAttachments(detail.id).then(
       ({ data }) => setDetailAtts(data),
       () => setDetailAtts([]),
     )
+    api.clientListTicketComments(detail.id).then(
+      ({ data }) => setDetailComments(data),
+      () => setDetailComments([]),
+    )
   }, [detail])
+
+  async function submitComment() {
+    if (!detail) return
+    const body = commentBody.trim()
+    if (!body) return
+    setSending(true)
+    try {
+      const c = await api.clientAddTicketComment(detail.id, body)
+      setDetailComments((cs) => [...(cs ?? []), c])
+      setCommentBody('')
+    } catch {
+      toast('Could not post the comment. Try again.', 'error')
+    } finally {
+      setSending(false)
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -357,6 +383,54 @@ export function ClientPortal() {
                     ))}
                   </div>
                 )}
+              </div>
+              {/* ---- comments thread (#43): read team questions, reply ---- */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground">Comments</span>
+                {detailComments === null && (
+                  <div className="inset-neu h-16 animate-pulse rounded-lg" aria-hidden />
+                )}
+                {detailComments?.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No comments yet — the team may ask questions here.
+                  </p>
+                )}
+                {detailComments && detailComments.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {detailComments.map((c) => (
+                      <div key={c.id} className="inset-neu rounded-lg p-3">
+                        <p className="flex items-baseline gap-2">
+                          <span className="text-xs font-medium text-foreground">{c.user.name}</span>
+                          <span className="font-mono text-[10px] text-muted-foreground/60">
+                            {fmtDate(c.created_at)}
+                          </span>
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{c.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
+                  <Textarea
+                    className="inset-neu min-h-10 resize-none"
+                    rows={2}
+                    placeholder="Write a reply…"
+                    aria-label="Write a comment"
+                    value={commentBody}
+                    onChange={(e) => setCommentBody(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submitComment()
+                    }}
+                  />
+                  <Button
+                    size="icon-sm"
+                    aria-label="Add comment"
+                    disabled={sending || !commentBody.trim()}
+                    onClick={() => void submitComment()}
+                  >
+                    <SendIcon strokeWidth={1.5} />
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 Last updated {fmtDate(detail.updated_at)}

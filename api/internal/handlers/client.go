@@ -138,6 +138,89 @@ func ClientCreateTicket(gdb *gorm.DB) fiber.Handler {
 	}
 }
 
+// clientCommentAuthorJSON: name only — the client surface never sees emails,
+// roles or any other user field (#43).
+type clientCommentAuthorJSON struct {
+	Name string `json:"name"`
+}
+
+// clientCommentJSON is the wire `client comment` shape — {id, body,
+// created_at, user:{name}}; team comments on the ticket are visible to the
+// client with the author name only.
+type clientCommentJSON struct {
+	ID        string                 `json:"id"`
+	Body      string                 `json:"body"`
+	CreatedAt time.Time              `json:"created_at"`
+	User      clientCommentAuthorJSON `json:"user"`
+}
+
+// ClientListTicketComments: GET /api/client/tickets/:id/comments — own tickets
+// only (loadOwnTicket); every comment on the ticket (team + client), oldest
+// first.
+func ClientListTicketComments(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		t, ok := loadOwnTicket(c, gdb, u, c.Params("id"))
+		if !ok {
+			return nil
+		}
+		var comments []models.Comment
+		if err := gdb.Where("task_id = ?", t.ID).Order("created_at").Find(&comments).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list comments")
+		}
+		names := map[string]string{}
+		if len(comments) > 0 {
+			ids := make([]string, 0, len(comments))
+			for i := range comments {
+				ids = append(ids, comments[i].UserID)
+			}
+			var rows []struct{ ID, Name string }
+			if err := gdb.Model(&models.User{}).Select("id, name").Where("id IN ?", ids).Scan(&rows).Error; err == nil {
+				for _, r := range rows {
+					names[r.ID] = r.Name
+				}
+			}
+		}
+		out := make([]clientCommentJSON, len(comments))
+		for i := range comments {
+			cm := &comments[i]
+			out[i] = clientCommentJSON{
+				ID: cm.ID, Body: cm.Body, CreatedAt: cm.CreatedAt,
+				User: clientCommentAuthorJSON{Name: names[cm.UserID]},
+			}
+		}
+		return c.JSON(fiber.Map{"data": out})
+	}
+}
+
+// ClientCreateTicketComment: POST /api/client/tickets/:id/comments {body} —
+// same request shape as the team endpoint; author = the client user id (same
+// comments table, so the team drawer shows it with the client's name).
+func ClientCreateTicketComment(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		t, ok := loadOwnTicket(c, gdb, u, c.Params("id"))
+		if !ok {
+			return nil
+		}
+		var req createCommentReq
+		if err := c.BodyParser(&req); err != nil {
+			return httpErr(c, fiber.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		}
+		if strings.TrimSpace(req.Body) == "" {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "body is required")
+		}
+		cm := &models.Comment{TaskID: t.ID, UserID: u.ID, Body: req.Body}
+		if err := gdb.Create(cm).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create comment")
+		}
+		return c.Status(fiber.StatusCreated).JSON(clientCommentJSON{
+			ID: cm.ID, Body: cm.Body, CreatedAt: cm.CreatedAt,
+			User: clientCommentAuthorJSON{Name: u.Name},
+		})
+	}
+}
+
 // ClientListTickets: GET /api/client/tickets — own tickets across all linked
 // projects, newest-updated first. Soft-deleted (trashed) tickets disappear —
 // clients track live work only.

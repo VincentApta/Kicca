@@ -64,7 +64,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | DELETE | /tasks/:id | — | trash (soft); `?purge=1` admin hard delete |
 | POST | /tasks/:id/restore | — | back to backlog |
 | POST | /tasks/:id/move | `{status, before_task_id?, after_task_id?}` | server computes position; stamps analytics (rule 8) |
-| GET/POST | /tasks/:id/comments | `{body}` | |
+| GET/POST | /tasks/:id/comments | `{body}` | response rows add `author` (resolved display name) |
 | GET/POST | /tasks/:id/attachments | multipart `file` (images png/jpeg/webp/gif, videos mp4/mov/webm) | type sniffed server-side; size capped ATTACHMENTS_MAX_MB (default 25MB); 422 otherwise |
 | GET | /attachments/:id | — | streams blob (Content-Type sniffed, inline); team via project visibility, client via created_by |
 | DELETE | /attachments/:id | — | team only (project visibility); 204 |
@@ -87,10 +87,13 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 | POST | /client/tickets | `{project_id, title, description}` | 201 ticket → task status=inbox, created_by=client, per-project numbering; unlinked project 404 (no leak) |
 | GET | /client/tickets | ?page | own tickets (created_by=me, linked projects), newest-updated first |
 | GET/POST | /client/tickets/:id/attachments | multipart `file` | own tickets only; listing/streaming limited to attachments the client created |
+| GET/POST | /client/tickets/:id/comments | `{body}` (#43) | own tickets only; whole thread (team + client comments), oldest first |
 
 `client ticket` = `{id, project_id, project_key, number, title, description, status, created_at, updated_at}` — assessment and other team-only fields are never serialized.
 
 `client attachment` = `{id, filename, content_type, size_bytes, created_at}` — minimal fields only; created_by and task_id never serialize on the client surface.
+
+`client comment` (#43) = `{id, body, created_at, user: {name}}` — author name only; user_id, email and every other user field never serialize on the client surface.
 
 ### Misc
 | Method | Path | Notes |

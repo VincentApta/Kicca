@@ -98,6 +98,7 @@ export type Comment = {
   user_id: string
   body: string
   created_at: string
+  author: string // resolved display name (client-portal authors have no members row)
 }
 
 export type Paginated<T> = {
@@ -168,6 +169,17 @@ export type ClientTicket = {
   status: Status
   created_at: string
   updated_at: string
+}
+
+/**
+ * Client ticket comments (#43): {id, body, created_at, user:{name}} — no
+ * user_id/email; team comments show the author name only.
+ */
+export type ClientComment = {
+  id: string
+  body: string
+  created_at: string
+  user: { name: string }
 }
 
 /**

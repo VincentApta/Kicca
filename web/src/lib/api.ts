@@ -3,6 +3,7 @@
 
 import type {
   Attachment,
+  ClientComment,
   ClientProjectRef,
   ClientTicket,
   Comment,
@@ -204,4 +205,10 @@ export const api = {
     req<{ data: Attachment[] }>(`/client/tickets/${ticketId}/attachments`),
   clientUploadTicketAttachment: (ticketId: string, file: File) =>
     req<Attachment>(`/client/tickets/${ticketId}/attachments`, { method: 'POST', body: fileForm(file) }),
+
+  // Client ticket comments (#43) — author name only in responses
+  clientListTicketComments: (ticketId: string) =>
+    req<{ data: ClientComment[] }>(`/client/tickets/${ticketId}/comments`),
+  clientAddTicketComment: (ticketId: string, body: string) =>
+    req<ClientComment>(`/client/tickets/${ticketId}/comments`, { method: 'POST', body: { body } }),
 }
