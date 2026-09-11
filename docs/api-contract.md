@@ -19,16 +19,14 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | POST | /auth/logout | — | 204 | clears cookie |
 | GET | /auth/me | — | 200 `{user}` | |
 
-`user` = `{id, email, name, global_role}`.
+`user` = `{id, email, name, global_role}`. Admin user-management responses add `disabled: true` for soft-disabled accounts (#45; omitted when active) and `project_ids: []` for client-role rows.
 
 ### Users (global admin)
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | /users | ?page | list |
 | POST | /users | `{email, name, password, global_role, project_ids?}` | 201 user; 409 email exists; client role requires ≥1 project_id |
-| PATCH | /users/:id | `{name?, global_role?, password?, disabled?, project_ids?}` | project_ids (client only) replaces links; client→member drops them |
-
-`user` (user-management responses) may add `project_ids: []` for client-role rows.
+| PATCH | /users/:id | `{name?, global_role?, password?, disabled?, project_ids?}` | project_ids (client only) replaces links; client→member drops them; `disabled` toggles disabled_at (#45) — 409 `self_disable` on your own account, 409 `last_admin` on the last enabled admin |
 
 ### Teams (global admin; members read)
 | Method | Path | Body | Notes |

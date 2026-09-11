@@ -20,6 +20,7 @@ export type User = {
   name: string
   global_role: GlobalRole
   project_ids?: string[] // client role only, admin user-management responses
+  disabled?: boolean // true when soft-disabled (#45); omitted when active
 }
 
 export type UserCreate = {

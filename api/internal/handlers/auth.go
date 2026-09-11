@@ -18,16 +18,19 @@ import (
 // userJSON is the wire `user` shape: {id, email, name, global_role}. The
 // password hash is never serialized. ProjectIDs carries a client's project
 // links on the admin user-management responses only (omitempty elsewhere).
+// Disabled flags a soft-disabled account (issue #45 — Users page toggle);
+// omitted on active accounts.
 type userJSON struct {
 	ID         string   `json:"id"`
 	Email      string   `json:"email"`
 	Name       string   `json:"name"`
 	GlobalRole string   `json:"global_role"`
 	ProjectIDs []string `json:"project_ids,omitempty"`
+	Disabled   bool     `json:"disabled,omitempty"`
 }
 
 func toUserJSON(u *models.User) userJSON {
-	return userJSON{ID: u.ID, Email: u.Email, Name: u.Name, GlobalRole: u.GlobalRole}
+	return userJSON{ID: u.ID, Email: u.Email, Name: u.Name, GlobalRole: u.GlobalRole, Disabled: u.Disabled()}
 }
 
 // httpErr emits the contract error shape.
