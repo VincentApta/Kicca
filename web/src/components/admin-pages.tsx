@@ -1126,10 +1126,10 @@ export function FirstProjectDialog({
           <Field label="Key" htmlFor="first-project-key" error={errors.key}>
             <Input
               id="first-project-key"
-              className="inset-neu font-mono uppercase"
+              className="inset-neu font-mono"
               aria-invalid={!!errors.key}
               value={key}
-              onChange={(e) => setKey(e.target.value)}
+              onChange={(e) => setKey(e.target.value.toUpperCase())}
               maxLength={10}
             />
           </Field>
@@ -1306,10 +1306,10 @@ function GeneralTab({
       >
         <Input
           id="project-key"
-          className="inset-neu font-mono uppercase"
+          className="inset-neu font-mono"
           aria-invalid={!!errors.key}
           value={key}
-          onChange={(e) => setKey(e.target.value)}
+          onChange={(e) => setKey(e.target.value.toUpperCase())}
           disabled={!editable}
           maxLength={10}
         />
