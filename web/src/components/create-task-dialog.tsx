@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from 'react'
+import { PaperclipIcon } from 'lucide-react'
+import { ATTACHMENT_ACCEPT } from '@/components/attachments'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,6 +22,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { PRIORITY_ORDER } from '@/lib/board'
 import { PRIORITY_LABELS, STATUS_LABELS, TYPE_LABELS, SelectLabel } from '@/lib/labels'
+import { api } from '@/lib/api'
 import type { Label as LabelT, Priority, ProjectMember, Status, Task, TaskType } from '@/lib/types'
 
 export function CreateTaskDialog({
@@ -57,6 +60,7 @@ export function CreateTaskDialog({
   const [assigneeId, setAssigneeId] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [labelIds, setLabelIds] = useState<string[]>([])
+  const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -74,6 +78,7 @@ export function CreateTaskDialog({
     setAssigneeId('')
     setDueDate('')
     setLabelIds([])
+    setFiles([])
     setError('')
   }
 
@@ -94,6 +99,10 @@ export function CreateTaskDialog({
         due_date: dueDate || null,
         label_ids: labelIds,
       })
+      // attachments ride the create: task exists → upload, failures skipped
+      for (const f of files) {
+        api.uploadAttachment(task.id, f).catch(() => {})
+      }
       onCreated(task)
       reset()
       onClose()
@@ -247,6 +256,27 @@ export function CreateTaskDialog({
                 })}
               </div>
             </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="task-files">Attachments</Label>
+            <label
+              htmlFor="task-files"
+              className="inset-neu flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <PaperclipIcon className="size-3.5 shrink-0" strokeWidth={1.5} />
+              <span className="truncate">
+                {files.length === 0 ? 'Optional images / videos' : `${files.length} file(s) selected`}
+              </span>
+              <input
+                id="task-files"
+                type="file"
+                className="sr-only"
+                accept={ATTACHMENT_ACCEPT}
+                multiple
+                disabled={busy}
+                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+              />
+            </label>
           </div>
           {error && (
             <p role="alert" className="text-sm text-destructive">

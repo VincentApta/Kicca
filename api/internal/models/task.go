@@ -107,3 +107,29 @@ func (e *TaskEvent) BeforeCreate(_ *gorm.DB) error {
 	}
 	return nil
 }
+
+// TaskAttachment: one uploaded image/video per row (#34). Storage/object_key
+// point at the storage.Store blob; storage snapshots the backend at upload
+// time ('local' | 's3').
+type TaskAttachment struct {
+	ID          string `gorm:"primaryKey;type:uuid"`
+	TaskID      string `gorm:"not null;index;type:uuid"`
+	Filename    string `gorm:"not null"`
+	ContentType string `gorm:"not null"`
+	SizeBytes   int64  `gorm:"not null"`
+	Storage     string `gorm:"not null"`
+	ObjectKey   string `gorm:"not null"`
+	CreatedBy   string `gorm:"not null;type:uuid"`
+	CreatedAt   time.Time
+}
+
+// TableName pins the SQL-migration name (same reason as TaskEvent).
+func (TaskAttachment) TableName() string { return "task_attachments" }
+
+// BeforeCreate fills a uuid v4 primary key (app-side, both dialects).
+func (a *TaskAttachment) BeforeCreate(_ *gorm.DB) error {
+	if a.ID == "" {
+		a.ID = uuid.NewString()
+	}
+	return nil
+}

@@ -91,6 +91,21 @@ Analytics transition log — one row per status change (rule 8).
 | body | text | markdown |
 | created_at | timestamp | editable window 15 min `ponytail:` |
 
+### TaskAttachment (#34)
+| Field | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| task_id | FK Task | cascade delete |
+| filename | text | sanitized display name |
+| content_type | text | server-sniffed (http.DetectContentType), never client-declared |
+| size_bytes | bigint | capped by ATTACHMENTS_MAX_MB (default 25) |
+| storage | text | 'local' \| 's3' — backend snapshot at upload time |
+| object_key | text | opaque blob key (uuid + extension); S3 bucket is app-wide, never per-project |
+| created_by | FK User | team member or the ticket's client |
+| created_at | timestamp | |
+
+Allowed content types: png, jpeg, webp, gif, mp4 (video/mp4), mov (video/quicktime), webm.
+
 ### GitHubIssueLink
 | Field | Type | Notes |
 |---|---|---|
@@ -118,6 +133,8 @@ erDiagram
     Label ||--o{ TaskLabel : ""
     Task ||--o{ Comment : ""
     User ||--o{ Comment : ""
+    Task ||--o{ TaskAttachment : ""
+    User ||--o{ TaskAttachment : ""
     Task ||--o| GitHubIssueLink : ""
     User ||--o{ ClientProject : ""
     Project ||--o{ ClientProject : ""
@@ -142,3 +159,4 @@ erDiagram
 7. **Disabled user:** existing JWT rejected at middleware check (disabled_at lookup), sessions effectively dead; assigned tasks keep assignee (shows name, greyed).
 8. **Analytics stamps:** first entry into in_progress/review sets started_at (never overwritten); entry into done sets done_at; leaving done clears it (re-done re-stamps). Every status change (create counts, from NULL) writes a task_events row in the same transaction.
 9. **Client tickets (#32):** a client submits tickets only into linked projects (ClientProject row, else 404 no-leak); each lands as a Task with status=inbox, created_by=client, normal per-project numbering. Clients see only tickets they created (in linked projects) — never assessment or other team-only fields. Clients get 403 on all team endpoints; team users get 403 on /client/*. A client keeps ≥1 project link (enforced on create/patch).
+10. **Attachments (#34):** storage is S3 when S3_BUCKET is set (credentials via the default AWS chain, optional S3_ENDPOINT), else a local dir (ATTACHMENTS_DIR, default /data/attachments, a mounted volume). Team attaches on any visible task; clients only on their own tickets, and their list/stream is limited to attachments they created (created_by check — mirror of the GET auth). Uploads: multipart `file`, content type sniffed server-side against the allowlist, size capped by ATTACHMENTS_MAX_MB. Creating a GitHub issue embeds each attachment via github.com/user-attachments (URLs computed before the create call; images `![](url)`, videos bare URL). A failed upload never blocks the issue: S3 falls back to a presigned URL, local storage skips + logs.

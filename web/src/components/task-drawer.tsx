@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
-import { CheckIcon, PencilIcon, SendIcon, Trash2Icon, XIcon } from 'lucide-react'
+import { CheckIcon, PaperclipIcon, PencilIcon, SendIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { GithubIcon } from '@/components/github-icon'
+import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,6 +26,7 @@ import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { ApiError, api } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import type {
+  Attachment,
   Comment,
   GhLink,
   Label as LabelT,
@@ -110,6 +112,8 @@ function DrawerBody({
   const [commentBody, setCommentBody] = useState('')
   const [sending, setSending] = useState(false)
   const [creatingGh, setCreatingGh] = useState(false)
+  const [atts, setAtts] = useState<Attachment[] | null>(null)
+  const [uploading, setUploading] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -118,7 +122,39 @@ function DrawerBody({
       ({ data }) => setComments(data),
       () => setComments([]),
     )
+    setAtts(null)
+    api.listAttachments(task.id).then(
+      ({ data }) => setAtts(data),
+      () => setAtts([]),
+    )
   }, [task.id])
+
+  async function uploadFiles(files: FileList | null) {
+    if (!files?.length) return
+    setUploading(true)
+    let failed = 0
+    for (const f of files) {
+      try {
+        const a = await api.uploadAttachment(task.id, f)
+        setAtts((as) => [...(as ?? []), a])
+      } catch {
+        failed++
+      }
+    }
+    setUploading(false)
+    if (failed) toast(failed === files.length ? 'Upload failed' : `${files.length - failed} of ${files.length} uploaded`, 'error')
+    else toast('Attachment added')
+  }
+
+  async function deleteAttachment(id: string) {
+    try {
+      await api.deleteAttachment(id)
+      setAtts((as) => (as ?? []).filter((a) => a.id !== id))
+      toast('Attachment removed')
+    } catch {
+      toast('Delete failed', 'error')
+    }
+  }
 
   async function save(patch: TaskPatch, message = 'Saved') {
     try {
@@ -441,6 +477,41 @@ function DrawerBody({
                 )
               })}
             </div>
+          </div>
+        </section>
+
+        {/* attachments — upload, thumbnails; team-only delete */}
+        <section className="mt-6" aria-label="Attachments">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Attachments
+            </h3>
+            <label className="flex cursor-pointer items-center gap-1 rounded-md p-1 text-xs text-muted-foreground hover:text-foreground">
+              <PaperclipIcon className="size-3" strokeWidth={1.5} />
+              {uploading ? 'Uploading…' : 'Add files'}
+              <input
+                type="file"
+                className="sr-only"
+                accept={ATTACHMENT_ACCEPT}
+                multiple
+                disabled={uploading}
+                onChange={(e) => {
+                  void uploadFiles(e.target.files)
+                  e.target.value = '' // allow re-selecting the same file
+                }}
+              />
+            </label>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {atts === null && (
+              <div className="inset-neu size-20 animate-pulse rounded-lg" aria-hidden />
+            )}
+            {atts?.length === 0 && (
+              <p className="text-xs text-muted-foreground">None yet — images and short videos.</p>
+            )}
+            {atts?.map((a) => (
+              <AttachmentThumb key={a.id} a={a} onDelete={(id) => void deleteAttachment(id)} />
+            ))}
           </div>
         </section>
 

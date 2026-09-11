@@ -2,6 +2,7 @@
 // Cookie session: same-origin fetch sends kica_session automatically.
 
 import type {
+  Attachment,
   ClientProjectRef,
   ClientTicket,
   Comment,
@@ -40,10 +41,15 @@ async function req<T>(
   path: string,
   init?: Omit<RequestInit, 'body'> & { body?: unknown },
 ): Promise<T> {
+  const isForm = init?.body instanceof FormData
   const res = await fetch(`/api${path}`, {
     method: init?.method ?? 'GET',
-    headers: init?.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    headers: init?.body !== undefined && !isForm ? { 'Content-Type': 'application/json' } : undefined,
+    body: isForm
+      ? (init!.body as FormData)
+      : init?.body !== undefined
+        ? JSON.stringify(init.body)
+        : undefined,
     signal: init?.signal,
   })
   if (res.status === 204) return undefined as T
@@ -53,6 +59,13 @@ async function req<T>(
     throw new ApiError(res.status, err?.code ?? 'unknown', err?.message ?? res.statusText)
   }
   return json as T
+}
+
+/** multipart `file` body for the attachment endpoints */
+function fileForm(file: File): FormData {
+  const fd = new FormData()
+  fd.append('file', file)
+  return fd
 }
 
 export const api = {
@@ -165,6 +178,15 @@ export const api = {
   addComment: (taskId: string, body: string) =>
     req<Comment>(`/tasks/${taskId}/comments`, { method: 'POST', body: { body } }),
 
+  // Attachments (#34)
+  listAttachments: (taskId: string) =>
+    req<{ data: Attachment[] }>(`/tasks/${taskId}/attachments`),
+  uploadAttachment: (taskId: string, file: File) =>
+    req<Attachment>(`/tasks/${taskId}/attachments`, { method: 'POST', body: fileForm(file) }),
+  deleteAttachment: (id: string) =>
+    req<void>(`/attachments/${id}`, { method: 'DELETE' }),
+  attachmentUrl: (id: string) => `/api/attachments/${id}`,
+
   // GitHub
   createGithubIssue: (taskId: string) =>
     req<NonNullable<GhLink>>(`/tasks/${taskId}/github/issue`, { method: 'POST', body: {} }),
@@ -176,4 +198,8 @@ export const api = {
     req<Paginated<ClientTicket>>(`/client/tickets?page=${page}&per_page=${perPage}`),
   clientCreateTicket: (body: { project_id: string; title: string; description: string }) =>
     req<ClientTicket>('/client/tickets', { method: 'POST', body }),
+  clientListTicketAttachments: (ticketId: string) =>
+    req<{ data: Attachment[] }>(`/client/tickets/${ticketId}/attachments`),
+  clientUploadTicketAttachment: (ticketId: string, file: File) =>
+    req<Attachment>(`/client/tickets/${ticketId}/attachments`, { method: 'POST', body: fileForm(file) }),
 }

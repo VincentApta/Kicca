@@ -38,7 +38,7 @@ func newTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	}
 	if err := gdb.AutoMigrate(&models.User{}, &models.Team{}, &models.TeamMember{}, &models.Project{}, &models.ProjectMember{},
 		&models.Task{}, &models.Label{}, &models.TaskLabel{}, &models.Comment{}, &models.GitHubIssueLink{},
-		&models.TaskEvent{}, &models.ClientProject{}); err != nil {
+		&models.TaskEvent{}, &models.ClientProject{}, &models.TaskAttachment{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 	if err := db.SeedAdmin(gdb, adminEmail, adminPass); err != nil {

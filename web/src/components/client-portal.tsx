@@ -3,7 +3,8 @@
 // team nav; assessment and other team-only fields are never rendered (the
 // API doesn't even send them).
 import { useEffect, useState, type FormEvent } from 'react'
-import { LogOutIcon, MoonIcon, PlusIcon, SunIcon, TicketIcon } from 'lucide-react'
+import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SunIcon, TicketIcon } from 'lucide-react'
+import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -27,7 +28,7 @@ import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
 import { STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
-import type { ClientProjectRef, ClientTicket, Status } from '@/lib/types'
+import type { Attachment, ClientProjectRef, ClientTicket, Status } from '@/lib/types'
 
 // Same palette as my-tasks-page pills.
 const STATUS_COLORS: Record<string, string> = {
@@ -70,11 +71,13 @@ export function ClientPortal() {
   const projectLabels = Object.fromEntries((projects ?? []).map((p) => [p.id, `${p.name} · ${p.key}`]))
   const [tickets, setTickets] = useState<ClientTicket[] | null>(null)
   const [detail, setDetail] = useState<ClientTicket | null>(null)
+  const [detailAtts, setDetailAtts] = useState<Attachment[] | null>(null)
 
   // submit form
   const [projectId, setProjectId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [files, setFiles] = useState<File[]>([])
   const [errors, setErrors] = useState<{ title?: string; project?: string }>({})
   const [busy, setBusy] = useState(false)
 
@@ -96,6 +99,19 @@ export function ClientPortal() {
     refreshTickets()
   }, [])
 
+  // ticket detail loads its attachments (client-created ones only — the
+  // server filters to what this client may stream)
+  useEffect(() => {
+    if (!detail) {
+      setDetailAtts(null)
+      return
+    }
+    api.clientListTicketAttachments(detail.id).then(
+      ({ data }) => setDetailAtts(data),
+      () => setDetailAtts([]),
+    )
+  }, [detail])
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     const errs: typeof errors = {}
@@ -105,14 +121,24 @@ export function ClientPortal() {
     if (Object.keys(errs).length > 0) return
     setBusy(true)
     try {
-      await api.clientCreateTicket({
+      const ticket = await api.clientCreateTicket({
         project_id: projectId!,
         title: title.trim(),
         description: description.trim(),
       })
-      toast('Ticket submitted — the team will pick it up from the Inbox')
+      // attachments ride the create: ticket exists → upload, failures skipped
+      let failed = 0
+      for (const f of files) {
+        try {
+          await api.clientUploadTicketAttachment(ticket.id, f)
+        } catch {
+          failed++
+        }
+      }
+      toast(failed > 0 ? 'Ticket submitted; some attachments failed' : 'Ticket submitted — the team will pick it up from the Inbox')
       setTitle('')
       setDescription('')
+      setFiles([])
       refreshTickets()
     } catch {
       setErrors({ title: 'Could not submit the ticket. Try again.' })
@@ -214,6 +240,27 @@ export function ClientPortal() {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ticket-files">Attachments</Label>
+              <label
+                htmlFor="ticket-files"
+                className="inset-neu flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <PaperclipIcon className="size-3.5 shrink-0" strokeWidth={1.5} />
+                <span className="truncate">
+                  {files.length === 0 ? 'Optional images / videos' : `${files.length} file(s) selected`}
+                </span>
+                <input
+                  id="ticket-files"
+                  type="file"
+                  className="sr-only"
+                  accept={ATTACHMENT_ACCEPT}
+                  multiple
+                  disabled={busy}
+                  onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+                />
+              </label>
+            </div>
             <Button type="submit" disabled={busy || projects === null}>
               <PlusIcon strokeWidth={1.5} />
               {busy ? 'Submitting…' : 'Submit ticket'}
@@ -294,6 +341,22 @@ export function ClientPortal() {
                 <p className="whitespace-pre-wrap text-sm text-foreground">
                   {detail.description || 'No description provided.'}
                 </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground">Attachments</span>
+                {detailAtts === null && (
+                  <div className="inset-neu size-20 animate-pulse rounded-lg" aria-hidden />
+                )}
+                {detailAtts?.length === 0 && (
+                  <p className="text-xs text-muted-foreground">None.</p>
+                )}
+                {detailAtts && detailAtts.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {detailAtts.map((a) => (
+                      <AttachmentThumb key={a.id} a={a} />
+                    ))}
+                  </div>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Last updated {fmtDate(detail.updated_at)}

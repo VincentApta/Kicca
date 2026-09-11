@@ -48,6 +48,10 @@ func (m *ghMock) handler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(s)
+	if strings.HasSuffix(r.URL.Path, "/user/attachments") { // attachment upload (#34)
+		fmt.Fprintf(w, `{"browser_download_url":"https://github.com/user-attachments/assets/att123"}`)
+		return
+	}
 	fmt.Fprintf(w, `{"number":42,"html_url":"https://github.com/acme/app/issues/42"}`)
 }
 
@@ -74,6 +78,7 @@ func ghFixture(t *testing.T, statuses ...int) (*fiber.App, *gorm.DB, *ghMock, st
 	srv := httptest.NewServer(http.HandlerFunc(mock.handler))
 	t.Cleanup(srv.Close)
 	t.Setenv("GITHUB_API_BASE", srv.URL)
+	t.Setenv("GITHUB_UPLOADS_BASE", srv.URL)
 
 	app, gdb := newTestApp(t)
 	admin := loginAndGet(t, app, adminEmail, adminPass)
