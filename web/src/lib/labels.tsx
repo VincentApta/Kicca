@@ -1,7 +1,7 @@
 // Human display labels for wire values. Base UI's Select.Value renders the
 // raw stored value by default — SelectLabel maps it back to display text for
 // triggers; item lists reuse the same maps.
-import type { Priority, Status } from './types'
+import type { Priority, Status, TaskType } from './types'
 
 export const PRIORITY_LABELS = {
   urgent: 'Urgent',
@@ -9,6 +9,13 @@ export const PRIORITY_LABELS = {
   medium: 'Medium',
   low: 'Low',
 } satisfies Record<Priority, string>
+
+export const TYPE_LABELS = {
+  task: 'Task',
+  bug: 'Bug',
+  feature: 'Feature',
+  chore: 'Chore',
+} satisfies Record<TaskType, string>
 
 export const STATUS_LABELS = {
   inbox: 'Inbox',

@@ -19,8 +19,8 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { PRIORITY_ORDER } from '@/lib/board'
-import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
-import type { Label as LabelT, Priority, ProjectMember, Status, Task } from '@/lib/types'
+import { PRIORITY_LABELS, STATUS_LABELS, TYPE_LABELS, SelectLabel } from '@/lib/labels'
+import type { Label as LabelT, Priority, ProjectMember, Status, Task, TaskType } from '@/lib/types'
 
 export function CreateTaskDialog({
   open,
@@ -42,6 +42,8 @@ export function CreateTaskDialog({
     description?: string
     status: Status
     priority?: Priority
+    type?: TaskType
+    estimate?: number | null
     assignee_id?: string | null
     due_date?: string | null
     label_ids?: string[]
@@ -50,6 +52,8 @@ export function CreateTaskDialog({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
+  const [type, setType] = useState<TaskType>('task')
+  const [estimate, setEstimate] = useState('')
   const [assigneeId, setAssigneeId] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [labelIds, setLabelIds] = useState<string[]>([])
@@ -65,6 +69,8 @@ export function CreateTaskDialog({
     setTitle('')
     setDescription('')
     setPriority('medium')
+    setType('task')
+    setEstimate('')
     setAssigneeId('')
     setDueDate('')
     setLabelIds([])
@@ -82,6 +88,8 @@ export function CreateTaskDialog({
         description: description.trim() || undefined,
         status,
         priority,
+        type,
+        estimate: estimate === '' ? null : Math.max(0, Number(estimate)),
         assignee_id: assigneeId || null,
         due_date: dueDate || null,
         label_ids: labelIds,
@@ -144,8 +152,41 @@ export function CreateTaskDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="task-assignee">Assignee</Label>
+              <Label htmlFor="task-type">Type</Label>
+              <Select id="task-type" value={type} onValueChange={(v) => setType(v as TaskType)}>
+                <SelectTrigger className="inset-neu w-full border-0">
+                  <SelectValue>
+                    <SelectLabel value={type} labelMap={TYPE_LABELS} />
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(TYPE_LABELS) as TaskType[]).map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TYPE_LABELS[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="task-estimate">Estimate (points)</Label>
+              <Input
+                id="task-estimate"
+                type="number"
+                min={0}
+                step={1}
+                className="inset-neu"
+                placeholder="—"
+                value={estimate}
+                onChange={(e) => setEstimate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="task-assignee">Assignee</Label>
               <Select
                 id="task-assignee"
                 value={assigneeId || null}
@@ -166,7 +207,6 @@ export function CreateTaskDialog({
                 </SelectContent>
               </Select>
             </div>
-          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor="task-due">Due date</Label>
