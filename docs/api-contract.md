@@ -85,7 +85,7 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 |---|---|---|---|
 | GET | /client/projects | — | linked projects: `{data: [{id, key, name}]}` |
 | POST | /client/tickets | `{project_id, title, description}` | 201 ticket → task status=inbox, created_by=client, per-project numbering; unlinked project 404 (no leak) |
-| GET | /client/tickets | ?page | own tickets (created_by=me, linked projects), newest-updated first |
+| GET | /client/tickets | ?q=&project_id=&status=&page | own tickets (created_by=me, linked projects), newest-updated first; q matches title/description (case-insensitive), project_id must be a linked project (unlinked → empty, no leak), status = `open` (not done) \| `closed` (done) (#47) |
 | GET/POST | /client/tickets/:id/attachments | multipart `file` | own tickets only; listing/streaming limited to attachments the client created |
 | GET/POST | /client/tickets/:id/comments | `{body}` (#43) | own tickets only; whole thread (team + client comments), oldest first |
 

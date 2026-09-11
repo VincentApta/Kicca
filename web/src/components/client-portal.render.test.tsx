@@ -141,4 +141,27 @@ describe('ClientPortal comments (#43)', () => {
     await act(async () => {})
     expect(document.body.textContent).toContain('No comments yet')
   })
+
+  it('search box + filter selects drive the tickets fetch (#47)', async () => {
+    stubFetch()
+    await mount()
+
+    // filter selects exist alongside the search box
+    expect(document.querySelector('input[aria-label="Search tickets"]')).toBeTruthy()
+    expect(document.querySelector('[aria-label="Filter by project"]')).toBeTruthy()
+    expect(document.querySelector('[aria-label="Filter by status"]')).toBeTruthy()
+
+    // typing (debounced 250ms) refetches with ?q=
+    const box = document.querySelector('input[aria-label="Search tickets"]') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      setter.call(box, 'printer')
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 300)) // debounce
+    })
+    const asked = fetchMock.mock.calls.map((c) => String(c[0])).filter((u) => u.includes('q='))
+    expect(asked).toContain('/api/client/tickets?page=1&per_page=50&q=printer')
+  })
 })

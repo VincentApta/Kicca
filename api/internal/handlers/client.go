@@ -221,9 +221,59 @@ func ClientCreateTicketComment(gdb *gorm.DB) fiber.Handler {
 	}
 }
 
-// ClientListTickets: GET /api/client/tickets — own tickets across all linked
-// projects, newest-updated first. Soft-deleted (trashed) tickets disappear —
-// clients track live work only.
+// clientTicketFilters: the /client/tickets query params shared by list +
+// export (#47/#50).
+type clientTicketFilters struct {
+	Q         string
+	ProjectID string
+	Status    string // open (not done) | closed (done)
+}
+
+// parseClientTicketFilters validates the filters. Returns the rejection
+// message, "" when valid. The linked-project scope already hides unlinked
+// project_ids — an empty result, no leak.
+func parseClientTicketFilters(c *fiber.Ctx) (clientTicketFilters, string) {
+	f := clientTicketFilters{
+		Q:         strings.TrimSpace(c.Query("q")),
+		ProjectID: c.Query("project_id"),
+		Status:    c.Query("status"),
+	}
+	if f.ProjectID != "" {
+		if _, err := uuid.Parse(f.ProjectID); err != nil {
+			return f, "project_id must be a uuid"
+		}
+	}
+	switch f.Status {
+	case "", "open", "closed":
+	default:
+		return f, "status must be open or closed"
+	}
+	return f, ""
+}
+
+// applyClientTicketFilters: the client-ticket predicates — same search as the
+// team list (LOWER…LIKE works on PG and sqlite), open/closed split, project.
+func applyClientTicketFilters(q *gorm.DB, f clientTicketFilters) *gorm.DB {
+	if f.ProjectID != "" {
+		q = q.Where("project_id = ?", f.ProjectID)
+	}
+	switch f.Status {
+	case "open":
+		q = q.Where("status <> ?", "done")
+	case "closed":
+		q = q.Where("status = ?", "done")
+	}
+	if f.Q != "" {
+		like := "%" + strings.ToLower(f.Q) + "%"
+		q = q.Where("(LOWER(title) LIKE ? OR LOWER(description) LIKE ?)", like, like)
+	}
+	return q
+}
+
+// ClientListTickets: GET /api/client/tickets?q=&project_id=&status= — own
+// tickets across all linked projects, newest-updated first (#47 search +
+// filters, same pattern as the team list). Soft-deleted (trashed) tickets
+// disappear — clients track live work only.
 func ClientListTickets(gdb *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		u := currentUser(c)
@@ -231,11 +281,17 @@ func ClientListTickets(gdb *gorm.DB) fiber.Handler {
 		if err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list projects")
 		}
+		f, msg := parseClientTicketFilters(c)
+		if msg != "" {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", msg)
+		}
 		page := queryInt(c, "page", 1)
 		perPage := queryInt(c, "per_page", defaultPerPage)
 		scope := func() *gorm.DB {
-			return gdb.Model(&models.Task{}).
-				Where("created_by = ? AND project_id IN ?", u.ID, ids)
+			return applyClientTicketFilters(
+				gdb.Model(&models.Task{}).Where("created_by = ? AND project_id IN ?", u.ID, ids),
+				f,
+			)
 		}
 		var total int64
 		if err := scope().Count(&total).Error; err != nil {

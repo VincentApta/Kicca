@@ -197,8 +197,17 @@ export const api = {
   // Client portal (client role only; team users get 403)
   clientListProjects: () =>
     req<{ data: ClientProjectRef[] }>('/client/projects'),
-  clientListTickets: (page = 1, perPage = 50) =>
-    req<Paginated<ClientTicket>>(`/client/tickets?page=${page}&per_page=${perPage}`),
+  clientListTickets: (
+    f: { q?: string; project_id?: string; status?: 'open' | 'closed' } = {},
+    page = 1,
+    perPage = 50,
+  ) => {
+    const p = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+    for (const [k, v] of Object.entries(f)) {
+      if (v !== undefined && v !== '') p.set(k, v)
+    }
+    return req<Paginated<ClientTicket>>(`/client/tickets?${p}`)
+  },
   clientCreateTicket: (body: { project_id: string; title: string; description: string }) =>
     req<ClientTicket>('/client/tickets', { method: 'POST', body }),
   clientListTicketAttachments: (ticketId: string) =>

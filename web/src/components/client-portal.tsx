@@ -3,7 +3,7 @@
 // team nav; assessment and other team-only fields are never rendered (the
 // API doesn't even send them).
 import { useEffect, useState, type FormEvent } from 'react'
-import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
+import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { Button } from '@/components/ui/button'
 import {
@@ -76,6 +76,12 @@ export function ClientPortal() {
   const [commentBody, setCommentBody] = useState('')
   const [sending, setSending] = useState(false)
 
+  // my-tickets search + filters (#47) — server-side, same as the team list
+  const [search, setSearch] = useState('')
+  const [ticketsQ, setTicketsQ] = useState('') // debounced search
+  const [filterProject, setFilterProject] = useState('') // '' = all linked
+  const [filterStatus, setFilterStatus] = useState('') // '' | open | closed
+
   // submit form
   const [projectId, setProjectId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
@@ -84,12 +90,27 @@ export function ClientPortal() {
   const [errors, setErrors] = useState<{ title?: string; project?: string }>({})
   const [busy, setBusy] = useState(false)
 
-  function refreshTickets() {
-    api.clientListTickets().then(
+  // debounce the search box → ticketsQ
+  useEffect(() => {
+    const t = setTimeout(() => setTicketsQ(search), 250)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // filtered fetch — q, linked project, open/closed
+  function fetchTickets() {
+    api.clientListTickets({
+      q: ticketsQ || undefined,
+      project_id: filterProject || undefined,
+      status: filterStatus === '' ? undefined : (filterStatus as 'open' | 'closed'),
+    }).then(
       ({ data }) => setTickets(data),
       () => setTickets([]),
     )
   }
+
+  useEffect(() => {
+    fetchTickets()
+  }, [ticketsQ, filterProject, filterStatus])
 
   useEffect(() => {
     api.clientListProjects().then(
@@ -99,7 +120,6 @@ export function ClientPortal() {
       },
       () => setProjects([]),
     )
-    refreshTickets()
   }, [])
 
   // ticket detail loads its attachments (client-created ones only — the
@@ -165,7 +185,7 @@ export function ClientPortal() {
       setTitle('')
       setDescription('')
       setFiles([])
-      refreshTickets()
+      fetchTickets()
     } catch {
       setErrors({ title: 'Could not submit the ticket. Try again.' })
     } finally {
@@ -302,6 +322,55 @@ export function ClientPortal() {
         {/* ---- my tickets ---- */}
         <section className="card-neu flex flex-col gap-3 p-5">
           <h2 className="font-heading text-lg font-semibold text-foreground">My tickets</h2>
+          {/* search + filters (#47) — server-side, mirrors the team list */}
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+            <Input
+              className="inset-neu border-0 pl-8"
+              placeholder="Search tickets…"
+              aria-label="Search tickets"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select
+              value={filterProject || null}
+              onValueChange={(v) => setFilterProject(v && v !== 'all' ? v : '')}
+              disabled={(projects?.length ?? 0) === 0}
+            >
+              <SelectTrigger className="inset-neu w-full border-0 text-xs" aria-label="Filter by project">
+                <SelectValue placeholder="All projects">
+                  {filterProject ? <SelectLabel value={filterProject} labelMap={projectLabels} /> : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects</SelectItem>
+                {(projects ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} · {p.key}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={filterStatus || null}
+              onValueChange={(v) => setFilterStatus(v === 'all' ? '' : (v ?? ''))}
+            >
+              <SelectTrigger className="inset-neu w-40 border-0 text-xs" aria-label="Filter by status">
+                <SelectValue placeholder="All statuses">
+                  {filterStatus ? (
+                    <span className="capitalize">{filterStatus}</span>
+                  ) : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {tickets === null && (
             <div className="flex flex-col gap-2" aria-hidden>
               {[0, 1, 2].map((i) => (
@@ -311,7 +380,9 @@ export function ClientPortal() {
           )}
           {tickets?.length === 0 && (
             <p className="py-4 text-sm text-muted-foreground">
-              Nothing yet — your submitted tickets and their status show up here.
+              {ticketsQ || filterProject || filterStatus
+                ? 'No tickets match — adjust the search or filters.'
+                : 'Nothing yet — your submitted tickets and their status show up here.'}
             </p>
           )}
           <ul className="flex flex-col gap-2">
