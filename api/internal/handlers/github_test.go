@@ -48,7 +48,7 @@ func (m *ghMock) handler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(s)
-	if strings.HasSuffix(r.URL.Path, "/user/attachments") { // attachment upload (#34)
+	if strings.HasPrefix(r.URL.Path, "/user/attachments") { // attachment upload (#34)
 		fmt.Fprintf(w, `{"browser_download_url":"https://github.com/user-attachments/assets/att123"}`)
 		return
 	}

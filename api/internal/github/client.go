@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -45,17 +47,37 @@ func uploadsBase() string {
 	return "https://uploads.github.com"
 }
 
-// UploadAttachment POSTs raw file bytes to /user/attachments and returns the
-// permanent browser_download_url (renders inline in issue bodies). No retry:
-// the caller skips the attachment on failure rather than failing the issue.
+// UploadAttachment POSTs the file as multipart/form-data to
+// /user/attachments?name=<filename> and returns the permanent
+// browser_download_url (renders inline in issue bodies). GitHub requires
+// multipart + the name query param (raw body gets 400 "Multipart form data
+// required") and answers 202 Accepted. No retry: the caller skips the
+// attachment on failure rather than failing the issue.
 func (c *Client) UploadAttachment(token, filename, contentType string, body io.Reader) (string, error) {
-	req, err := http.NewRequest(http.MethodPost, uploadsBase()+"/user/attachments", body)
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, err := mw.CreateFormField("file")
+	if err != nil {
+		return "", fmt.Errorf("build multipart: %w", err)
+	}
+	if _, err := io.Copy(fw, body); err != nil {
+		return "", fmt.Errorf("copy attachment: %w", err)
+	}
+	if err := mw.Close(); err != nil {
+		return "", fmt.Errorf("close multipart: %w", err)
+	}
+
+	name := url.QueryEscape(filename)
+	// ponytail: GitHub ignores the Content-Type of the multipart field — it
+	// sniffs the bytes server-side; the field's own type is not settable
+	// through CreateFormField without a Writer.SetField wrapper.
+	req, err := http.NewRequest(http.MethodPost, uploadsBase()+"/user/attachments?name="+name, &buf)
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("github uploads unreachable: %v", err)
@@ -65,7 +87,7 @@ func (c *Client) UploadAttachment(token, filename, contentType string, body io.R
 	if err != nil {
 		return "", fmt.Errorf("read github response: %v", err)
 	}
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusCreated {
 		return "", fmt.Errorf("github uploads returned %d", resp.StatusCode)
 	}
 	var out struct {
