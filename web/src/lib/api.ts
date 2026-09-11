@@ -105,6 +105,8 @@ export const api = {
     id: string,
     body: Partial<Pick<Project, 'name' | 'key' | 'description'>>,
   ) => req<Project>(`/projects/${id}`, { method: 'PATCH', body }),
+  deleteProject: (id: string) =>
+    req<void>(`/projects/${id}`, { method: 'DELETE' }),
   saveProjectGithub: (id: string, body: { repo: string; token?: string }) =>
     req<{ repo: string }>(`/projects/${id}/github`, { method: 'PUT', body }),
   replaceProjectMembers: (

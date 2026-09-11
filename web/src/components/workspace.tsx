@@ -352,6 +352,11 @@ export function Workspace() {
             labels={labels}
             canManage={canManageProject}
             onRefresh={refreshProject}
+            onDeleted={() => {
+              setCurrentProjectId(null)
+              refreshProject()
+              setView('projects')
+            }}
           />
         ) : (
           <BootSkeleton />

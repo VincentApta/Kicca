@@ -1172,12 +1172,14 @@ export function ProjectSettingsPage({
   labels,
   canManage,
   onRefresh,
+  onDeleted,
 }: {
   project: Project
   detail: ProjectDetail | null
   labels: LabelT[]
   canManage: boolean
   onRefresh: () => void
+  onDeleted: () => void
 }) {
   const [tab, setTab] = useState<SettingsTab>('general')
 
@@ -1211,7 +1213,7 @@ export function ProjectSettingsPage({
           </p>
         )}
         {canManage && tab === 'general' && (
-          <GeneralTab key={detail?.id ?? 'loading'} detail={detail} onRefresh={onRefresh} />
+          <GeneralTab key={detail?.id ?? 'loading'} detail={detail} onRefresh={onRefresh} onDeleted={onDeleted} />
         )}
         {canManage && tab === 'members' && detail && (
           <MembersTab key={detail.id} detail={detail} onRefresh={onRefresh} />
@@ -1230,9 +1232,11 @@ export function ProjectSettingsPage({
 function GeneralTab({
   detail,
   onRefresh,
+  onDeleted,
 }: {
   detail: ProjectDetail | null
   onRefresh: () => void
+  onDeleted: () => void
 }) {
   const toast = useToast()
   const [name, setName] = useState('')
@@ -1336,6 +1340,43 @@ function GeneralTab({
         <div className="flex justify-end">
           <Button type="submit" disabled={busy}>
             {busy ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      )}
+      {editable && (
+        <div className="mt-6 border-t border-border pt-4">
+          <h2 className="font-heading text-base font-semibold text-destructive">
+            Danger zone
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Deleting is permanent (soft delete; board and history are hidden).
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-3 bg-destructive/10 text-destructive hover:bg-destructive/20"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(`Delete project "${detail.name}"? This cannot be undone.`)) {
+                setBusy(true)
+                api.deleteProject(detail.id).then(
+                  () => {
+                    toast('Project deleted')
+                    onDeleted()
+                  },
+                  (err) => {
+                    setBusy(false)
+                    if (err instanceof ApiError && err.status === 403) {
+                      toast('Only a global admin can delete projects', 'error')
+                    } else {
+                      toast('Delete failed', 'error')
+                    }
+                  },
+                )
+              }
+            }}
+          >
+            Delete project
           </Button>
         </div>
       )}
