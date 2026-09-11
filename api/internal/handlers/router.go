@@ -70,11 +70,12 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	projects.Post("/:id/labels", CreateLabel(gdb))
 	projects.Put("/:id/github", PutProjectGithub(gdb, ghEncKey))
 
-	// tasks — GET / and /events must be registered BEFORE the parametric
-	// /:id route (static-before-parametric, same as /api/users above)
+	// tasks — GET /, /events and /export must be registered BEFORE the
+	// parametric /:id route (static-before-parametric, same as /api/users)
 	tasks := api.Group("/tasks", middleware.RequireTeam(jwtSecret, gdb))
 	tasks.Get("/", MyTasks(gdb))
 	tasks.Get("/events", TaskEvents(gdb))
+	tasks.Get("/export", ExportTasks(gdb))
 	tasks.Get("/:id", GetTask(gdb))
 	tasks.Patch("/:id", PatchTask(gdb))
 	tasks.Delete("/:id", DeleteTask(gdb))
@@ -103,6 +104,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	client.Get("/projects", ClientListProjects(gdb))
 	client.Post("/tickets", ClientCreateTicket(gdb))
 	client.Get("/tickets", ClientListTickets(gdb))
+	client.Get("/tickets/export", ClientExportTickets(gdb)) // static before /:id
 	client.Post("/tickets/:id/attachments", ClientUploadTicketAttachment(gdb))
 	client.Get("/tickets/:id/attachments", ClientListTicketAttachments(gdb))
 	client.Get("/tickets/:id/comments", ClientListTicketComments(gdb))

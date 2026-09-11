@@ -69,6 +69,16 @@ function fileForm(file: File): FormData {
   return fd
 }
 
+/** Cookie-authenticated CSV download (#50) — the response carries
+ *  Content-Disposition: attachment, so the browser downloads, no navigation. */
+export function downloadCsv(path: string) {
+  const a = document.createElement('a')
+  a.href = path
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
 export const api = {
   // Auth
   login: (email: string, password: string) =>
@@ -220,4 +230,24 @@ export const api = {
     req<{ data: ClientComment[] }>(`/client/tickets/${ticketId}/comments`),
   clientAddTicketComment: (ticketId: string, body: string) =>
     req<ClientComment>(`/client/tickets/${ticketId}/comments`, { method: 'POST', body: { body } }),
+
+  // CSV export (#50) — same filters as the corresponding list endpoints
+  exportTasks: (
+    f: { project_id?: string; status?: string; assignee_id?: string; priority?: string; label?: string; q?: string } = {},
+  ) => {
+    const p = new URLSearchParams()
+    for (const [k, v] of Object.entries(f)) {
+      if (v !== undefined && v !== '') p.set(k, v)
+    }
+    const qs = p.toString()
+    downloadCsv(`/api/tasks/export${qs ? `?${qs}` : ''}`)
+  },
+  clientExportTickets: (f: { q?: string; project_id?: string; status?: 'open' | 'closed' } = {}) => {
+    const p = new URLSearchParams()
+    for (const [k, v] of Object.entries(f)) {
+      if (v !== undefined && v !== '') p.set(k, v)
+    }
+    const qs = p.toString()
+    downloadCsv(`/api/client/tickets/export${qs ? `?${qs}` : ''}`)
+  },
 }

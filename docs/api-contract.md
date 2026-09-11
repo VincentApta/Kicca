@@ -58,6 +58,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | GET | /projects/:id/tasks | `?status=&assignee_id=&priority=&label=&q=&page=` (default excludes trash) | `{data, page, per_page, total}` |
 | GET | /tasks | `?assignee_id=&page=&per_page=` (assignee optional) | global feed across visible projects; rows add `project_key`, `project_name` |
 | GET | /tasks/events | `?days=30&project_id=` (days capped 90) | `{days, data: [{date, counts: {status: n}}]}` end-of-day status counts (#26) |
+| GET | /tasks/export | `?project_id=&status=&assignee_id=&priority=&label=&q=` | 200 text/csv attachment (#50): same filters + visibility as the lists; project_id optional (omit = all visible projects). RFC4180 + UTF-8 BOM; columns id, number, title, status, priority, type, assignee, labels, created_by, created_at, updated_at, started_at, done_at, estimate, due_date, description |
 | POST | /projects/:id/tasks | `{title, description?, status?, priority?, type?, estimate?, assignee_id?, due_date?, label_ids?[]}` | 201 task; defaults status=backlog priority=medium type=task |
 | GET | /tasks/:id | — | task + labels + gh_link + comments separate |
 | PATCH | /tasks/:id | any task field incl. `status`, `position`, `type`, `estimate` (null clears) | member+ |
@@ -88,6 +89,7 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 | GET | /client/tickets | ?q=&project_id=&status=&page | own tickets (created_by=me, linked projects), newest-updated first; q matches title/description (case-insensitive), project_id must be a linked project (unlinked → empty, no leak), status = `open` (not done) \| `closed` (done) (#47) |
 | GET/POST | /client/tickets/:id/attachments | multipart `file` | own tickets only; listing/streaming limited to attachments the client created |
 | GET/POST | /client/tickets/:id/comments | `{body}` (#43) | own tickets only; whole thread (team + client comments), oldest first |
+| GET | /client/tickets/export | ?q=&project_id=&status= | 200 text/csv attachment (#50): own tickets, same filters as the list; columns id, project, number, title, status, created_at, updated_at, description (team-only fields never serialize) |
 
 `client ticket` = `{id, project_id, project_key, number, title, description, status, created_at, updated_at}` — assessment and other team-only fields are never serialized.
 

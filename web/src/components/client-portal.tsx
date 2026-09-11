@@ -3,7 +3,7 @@
 // team nav; assessment and other team-only fields are never rendered (the
 // API doesn't even send them).
 import { useEffect, useState, type FormEvent } from 'react'
-import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
+import { DownloadIcon, LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { Button } from '@/components/ui/button'
 import {
@@ -205,10 +205,25 @@ export function ClientPortal() {
         </span>
         <div className="ml-auto flex items-center gap-3">
           {me && (
-            <span className="text-sm text-muted-foreground">
+            <span className="hidden text-sm text-muted-foreground md:inline">
               {me.name} <span className="font-mono text-xs">({me.email})</span>
             </span>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              api.clientExportTickets({
+                q: ticketsQ || undefined,
+                project_id: filterProject || undefined,
+                status: filterStatus === '' ? undefined : (filterStatus as 'open' | 'closed'),
+              })
+            }
+            aria-label="Export my tickets as CSV"
+          >
+            <DownloadIcon strokeWidth={1.5} />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
           <Button
             variant="ghost"
             size="sm"

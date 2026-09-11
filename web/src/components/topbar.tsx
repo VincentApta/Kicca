@@ -1,4 +1,4 @@
-import { ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareKanbanIcon, SunIcon, XIcon } from 'lucide-react'
+import { DownloadIcon, ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareKanbanIcon, SunIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -72,6 +72,7 @@ export function Topbar({
   onToggleTheme,
   me,
   onLogout,
+  onExport,
 }: {
   project: { name: string; key: string } | null
   view: View
@@ -86,6 +87,7 @@ export function Topbar({
   onToggleTheme: () => void
   me: User
   onLogout: () => void
+  onExport: () => void
 }) {
   const showBoardControls = view === 'board' || view === 'list' || view === 'trash'
   const inProjectView = showBoardControls || view === 'settings'
@@ -183,6 +185,17 @@ export function Topbar({
       )}
 
       <div className="ml-auto flex items-center gap-2">
+        {showBoardControls && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onExport}
+            aria-label="Export the current task list as CSV"
+          >
+            <DownloadIcon strokeWidth={1.5} />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"

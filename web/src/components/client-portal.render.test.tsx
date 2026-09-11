@@ -163,5 +163,19 @@ describe('ClientPortal comments (#43)', () => {
     })
     const asked = fetchMock.mock.calls.map((c) => String(c[0])).filter((u) => u.includes('q='))
     expect(asked).toContain('/api/client/tickets?page=1&per_page=50&q=printer')
+
+    // Export (#50) rides the same filters — spy the synthetic download anchor
+    const hrefs: string[] = []
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        hrefs.push(this.getAttribute('href') ?? '')
+      })
+    const exportBtn = document.querySelector('[aria-label="Export my tickets as CSV"]') as HTMLButtonElement
+    await act(async () => {
+      exportBtn.click()
+    })
+    clickSpy.mockRestore()
+    expect(hrefs).toContain('/api/client/tickets/export?q=printer')
   })
 })

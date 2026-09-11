@@ -283,6 +283,72 @@ func validateLabelIDs(gdb *gorm.DB, projectID string, ids []string) string {
 	return ""
 }
 
+// taskListFilters holds the shared ListTasks/ExportTasks query params (#50:
+// one builder, not a copy).
+type taskListFilters struct {
+	Status, AssigneeID, Priority, Label, Q string
+}
+
+// parseTaskListFilters validates the shared filters. Returns the rejection
+// message, "" when valid.
+func parseTaskListFilters(c *fiber.Ctx) (taskListFilters, string) {
+	f := taskListFilters{
+		Status:     c.Query("status"),
+		AssigneeID: c.Query("assignee_id"),
+		Priority:   c.Query("priority"),
+		Label:      c.Query("label"),
+		Q:          strings.TrimSpace(c.Query("q")),
+	}
+	if f.Status != "" && !taskStatuses[f.Status] {
+		return f, "status must be a valid task status"
+	}
+	if f.AssigneeID != "" {
+		if _, err := uuid.Parse(f.AssigneeID); err != nil {
+			return f, "assignee_id must be a uuid"
+		}
+	}
+	if f.Priority != "" && !taskPriorities[f.Priority] {
+		return f, "priority must be a valid task priority"
+	}
+	if f.Label != "" {
+		if _, err := uuid.Parse(f.Label); err != nil {
+			return f, "label must be a label uuid"
+		}
+	}
+	return f, ""
+}
+
+// applyTaskListFilters adds the shared predicates: status with the trash
+// semantics of rule 4, assignee, priority, label, q. Everything except
+// project scoping, which differs between ListTasks (one visible project) and
+// ExportTasks (optional project_id, else all visible).
+func applyTaskListFilters(q *gorm.DB, gdb *gorm.DB, f taskListFilters) *gorm.DB {
+	if f.Status != "" {
+		q = q.Where("status = ?", f.Status)
+		if f.Status != "trash" {
+			q = q.Where("deleted_at IS NULL")
+		}
+	} else {
+		q = q.Where("deleted_at IS NULL")
+	}
+	if f.AssigneeID != "" {
+		q = q.Where("assignee_id = ?", f.AssigneeID)
+	}
+	if f.Priority != "" {
+		q = q.Where("priority = ?", f.Priority)
+	}
+	if f.Label != "" {
+		q = q.Where("id IN (?)", gdb.Model(&models.TaskLabel{}).Select("task_id").Where("label_id = ?", f.Label))
+	}
+	if f.Q != "" {
+		// LOWER…LIKE behaves identically on PG and sqlite (tests);
+		// PG ILIKE is the same for these two columns.
+		like := "%" + strings.ToLower(f.Q) + "%"
+		q = q.Where("(LOWER(title) LIKE ? OR LOWER(description) LIKE ?)", like, like)
+	}
+	return q
+}
+
 // ListTasks: GET /api/projects/:id/tasks — filters status/assignee_id/
 // priority/label/q + pagination. Trash excluded unless status=trash (rule 4).
 func ListTasks(gdb *gorm.DB) fiber.Handler {
@@ -292,52 +358,17 @@ func ListTasks(gdb *gorm.DB) fiber.Handler {
 		if !ok {
 			return nil
 		}
+		f, msg := parseTaskListFilters(c)
+		if msg != "" {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", msg)
+		}
 		page := queryInt(c, "page", 1)
 		perPage := queryInt(c, "per_page", defaultPerPage)
 		// fresh query per statement — reusing one after Count() drags the
 		// count(*) select into the Find (same pattern as ListTeams).
-		if status := c.Query("status"); status != "" && !taskStatuses[status] {
-			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "status must be a valid task status")
-		}
-		if a := c.Query("assignee_id"); a != "" {
-			if _, err := uuid.Parse(a); err != nil {
-				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "assignee_id must be a uuid")
-			}
-		}
-		if pr := c.Query("priority"); pr != "" && !taskPriorities[pr] {
-			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "priority must be a valid task priority")
-		}
-		if labelID := c.Query("label"); labelID != "" {
-			if _, err := uuid.Parse(labelID); err != nil {
-				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "label must be a label uuid")
-			}
-		}
 		scope := func() *gorm.DB {
-			q := gdb.Unscoped().Model(&models.Task{}).Where("project_id = ?", p.ID)
-			if status := c.Query("status"); status != "" {
-				q = q.Where("status = ?", status)
-				if status != "trash" {
-					q = q.Where("deleted_at IS NULL")
-				}
-			} else {
-				q = q.Where("deleted_at IS NULL")
-			}
-			if a := c.Query("assignee_id"); a != "" {
-				q = q.Where("assignee_id = ?", a)
-			}
-			if pr := c.Query("priority"); pr != "" {
-				q = q.Where("priority = ?", pr)
-			}
-			if labelID := c.Query("label"); labelID != "" {
-				q = q.Where("id IN (?)", gdb.Model(&models.TaskLabel{}).Select("task_id").Where("label_id = ?", labelID))
-			}
-			if search := strings.TrimSpace(c.Query("q")); search != "" {
-				// LOWER…LIKE behaves identically on PG and sqlite (tests);
-				// PG ILIKE is the same for these two columns.
-				like := "%" + strings.ToLower(search) + "%"
-				q = q.Where("(LOWER(title) LIKE ? OR LOWER(description) LIKE ?)", like, like)
-			}
-			return q
+			return applyTaskListFilters(
+				gdb.Unscoped().Model(&models.Task{}).Where("project_id = ?", p.ID), gdb, f)
 		}
 		var total int64
 		if err := scope().Count(&total).Error; err != nil {
