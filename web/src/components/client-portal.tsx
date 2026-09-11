@@ -3,7 +3,7 @@
 // team nav; assessment and other team-only fields are never rendered (the
 // API doesn't even send them).
 import { useEffect, useState, type FormEvent } from 'react'
-import { LogOutIcon, PlusIcon, TicketIcon } from 'lucide-react'
+import { LogOutIcon, MoonIcon, PlusIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,6 +24,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
+import { useTheme } from '@/hooks/use-theme'
 import { STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
 import type { ClientProjectRef, ClientTicket, Status } from '@/lib/types'
@@ -61,6 +62,7 @@ function fmtDate(iso: string) {
 
 export function ClientPortal() {
   const { state, logout } = useAuth()
+  const { theme, toggle } = useTheme()
   const toast = useToast()
   const me = state.phase === 'authenticated' ? state.user : null
 
@@ -135,6 +137,14 @@ export function ClientPortal() {
               {me.name} <span className="font-mono text-xs">({me.email})</span>
             </span>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggle}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <SunIcon strokeWidth={1.5} /> : <MoonIcon strokeWidth={1.5} />}
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => void logout()}>
             <LogOutIcon strokeWidth={1.5} />
             Log out
