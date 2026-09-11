@@ -18,8 +18,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 
-	"github.com/VincentApta/Kicca/api/internal/db"
-	"github.com/VincentApta/Kicca/api/internal/models"
+	"github.com/VincentApta/Kica/api/internal/db"
+	"github.com/VincentApta/Kica/api/internal/models"
 )
 
 const (
@@ -80,15 +80,15 @@ func do(t *testing.T, app *fiber.App, method, path, body string, cookie string) 
 	return resp.StatusCode, out, resp.Header
 }
 
-// sessionCookie extracts the kicca_session value from Set-Cookie.
+// sessionCookie extracts the kica_session value from Set-Cookie.
 func sessionCookie(t *testing.T, h http.Header) string {
 	t.Helper()
 	for _, c := range h.Values("Set-Cookie") {
-		if strings.HasPrefix(c, "kicca_session=") {
+		if strings.HasPrefix(c, "kica_session=") {
 			return strings.SplitN(c, ";", 2)[0]
 		}
 	}
-	t.Fatal("no kicca_session cookie in response")
+	t.Fatal("no kica_session cookie in response")
 	return ""
 }
 
@@ -174,7 +174,7 @@ func TestAuthFlow(t *testing.T) {
 func setCookieHas(t *testing.T, h http.Header, attr string) bool {
 	t.Helper()
 	for _, c := range h.Values("Set-Cookie") {
-		if strings.HasPrefix(c, "kicca_session=") && strings.Contains(c, attr) {
+		if strings.HasPrefix(c, "kica_session=") && strings.Contains(c, attr) {
 			return true
 		}
 	}

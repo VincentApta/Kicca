@@ -1,11 +1,11 @@
-// Package config loads kicca api configuration from environment variables.
+// Package config loads kica api configuration from environment variables.
 package config
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/VincentApta/Kicca/api/internal/github"
+	"github.com/VincentApta/Kica/api/internal/github"
 )
 
 // minJWTSecretLen: HS256 keys under 16 bytes are brute-forceable; refuse them.

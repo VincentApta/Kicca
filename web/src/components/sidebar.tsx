@@ -77,7 +77,7 @@ export function Sidebar({
         <div className="inset-neu flex size-8 shrink-0 items-center justify-center">
           <SquareKanbanIcon className="size-4 text-primary" strokeWidth={1.5} />
         </div>
-        {!collapsed && <span className="font-heading text-lg font-semibold text-foreground">kicca</span>}
+        {!collapsed && <span className="font-heading text-lg font-semibold text-foreground">kica</span>}
         {!collapsed && (
           <button
             type="button"

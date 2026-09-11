@@ -16,7 +16,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/VincentApta/Kicca/api/internal/models"
+	"github.com/VincentApta/Kica/api/internal/models"
 )
 
 //go:embed migrations/*.sql

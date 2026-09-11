@@ -4,7 +4,7 @@ export type Theme = 'dark' | 'light'
 
 function read(): Theme {
   try {
-    return localStorage.getItem('kicca-theme') === 'light' ? 'light' : 'dark'
+    return localStorage.getItem('kica-theme') === 'light' ? 'light' : 'dark'
   } catch {
     return 'dark'
   }
@@ -16,7 +16,7 @@ export function useTheme() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     try {
-      localStorage.setItem('kicca-theme', theme)
+      localStorage.setItem('kica-theme', theme)
     } catch {
       // private mode — session-only theme
     }

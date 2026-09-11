@@ -127,7 +127,7 @@ export function ClientPortal() {
         <span className="inset-neu flex size-8 items-center justify-center rounded-lg">
           <TicketIcon className="size-4 text-primary" strokeWidth={1.5} />
         </span>
-        <span className="font-heading font-semibold text-foreground">kicca</span>
+        <span className="font-heading font-semibold text-foreground">kica</span>
         <span className="ml-2 hidden text-sm text-muted-foreground sm:inline">
           Support portal
         </span>

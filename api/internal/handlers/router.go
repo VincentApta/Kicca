@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 
-	"github.com/VincentApta/Kicca/api/internal/middleware"
+	"github.com/VincentApta/Kica/api/internal/middleware"
 )
 
 // Register mounts all v1 routes. jwtSecret signs/verifies session cookies;

@@ -1,6 +1,6 @@
-# API Contract — kicca
+# API Contract — kica
 
-REST, JSON bodies, all under `/api`. Auth = httpOnly cookie `kicca_session` (JWT). See [[domain]], [[architecture]].
+REST, JSON bodies, all under `/api`. Auth = httpOnly cookie `kica_session` (JWT). See [[domain]], [[architecture]].
 
 Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status (400/401/403/404/409/422/500).
 

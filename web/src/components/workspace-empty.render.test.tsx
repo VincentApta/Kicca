@@ -10,9 +10,9 @@ import { ToastProvider } from '@/lib/toast'
 import { Workspace } from './workspace'
 import type { User } from '@/lib/types'
 
-const admin: User = { id: 'u1', email: 'root@kicca.dev', name: 'Root Admin', global_role: 'admin' }
-const member: User = { id: 'u2', email: 'ada@kicca.dev', name: 'Ada Lovelace', global_role: 'member' }
-const project = { id: 'p1', team_id: 't1', name: 'Kicca Core', key: 'KIC', description: '' }
+const admin: User = { id: 'u1', email: 'root@kica.dev', name: 'Root Admin', global_role: 'admin' }
+const member: User = { id: 'u2', email: 'ada@kica.dev', name: 'Ada Lovelace', global_role: 'member' }
+const project = { id: 'p1', team_id: 't1', name: 'Kica Core', key: 'KIC', description: '' }
 
 const calls: string[] = []
 
@@ -132,7 +132,7 @@ describe('Workspace empty-projects bootstrap', () => {
 
     await act(async () => {
       type(team as HTMLInputElement, 'Core')
-      type(name as HTMLInputElement, 'Kicca Core')
+      type(name as HTMLInputElement, 'Kica Core')
       type(key as HTMLInputElement, 'KIC')
     })
     await act(async () => {
@@ -144,6 +144,6 @@ describe('Workspace empty-projects bootstrap', () => {
     expect(calls).toContain('POST /api/teams')
     expect(calls).toContain('POST /api/projects')
     expect(button('Create the first project')).toBeFalsy() // dialog closed
-    expect(document.body.textContent).toContain('Kicca Core') // topbar project name
+    expect(document.body.textContent).toContain('Kica Core') // topbar project name
   })
 })

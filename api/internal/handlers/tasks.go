@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/VincentApta/Kicca/api/internal/models"
+	"github.com/VincentApta/Kica/api/internal/models"
 )
 
 // positionGap is the spacing on create/append/rebalance (rule 3). Rebalance

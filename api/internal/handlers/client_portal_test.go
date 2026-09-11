@@ -12,7 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/VincentApta/Kicca/api/internal/models"
+	"github.com/VincentApta/Kica/api/internal/models"
 )
 
 // mkClient creates a client user linked to the given projects, returns its

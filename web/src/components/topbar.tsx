@@ -95,7 +95,7 @@ export function Topbar({
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/60 px-4">
       <div className="hidden min-w-40 flex-col lg:flex">
         <span className="truncate text-sm font-medium text-foreground">
-          {inProjectView && project ? project.name : 'kicca'}
+          {inProjectView && project ? project.name : 'kica'}
         </span>
         {inProjectView && project && (
           <span className="font-mono text-xs text-muted-foreground">{project.key}</span>

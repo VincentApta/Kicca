@@ -16,7 +16,7 @@ import {
 describe('validateUserCreate', () => {
   it('passes a complete valid form', () => {
     expect(
-      validateUserCreate({ email: 'ada@kicca.dev', name: 'Ada', password: 'hunter2hunter2' }),
+      validateUserCreate({ email: 'ada@kica.dev', name: 'Ada', password: 'hunter2hunter2' }),
     ).toEqual({})
   })
 
@@ -65,13 +65,13 @@ describe('validateTeamName', () => {
 
 describe('validateProjectGeneral', () => {
   it('accepts a valid name + key', () => {
-    expect(validateProjectGeneral({ name: 'Kicca', key: 'KIC' })).toEqual({})
-    expect(validateProjectGeneral({ name: 'Kicca', key: 'K1' })).toEqual({})
-    expect(validateProjectGeneral({ name: 'Kicca', key: 'ABCDE12345' })).toEqual({})
+    expect(validateProjectGeneral({ name: 'Kica', key: 'KIC' })).toEqual({})
+    expect(validateProjectGeneral({ name: 'Kica', key: 'K1' })).toEqual({})
+    expect(validateProjectGeneral({ name: 'Kica', key: 'ABCDE12345' })).toEqual({})
   })
 
   it('rejects bad keys per contract regex', () => {
-    const bad = (key: string) => validateProjectGeneral({ name: 'Kicca', key })
+    const bad = (key: string) => validateProjectGeneral({ name: 'Kica', key })
     expect(bad('kic').key).toBeTruthy() // lowercase start
     expect(bad('K').key).toBeTruthy() // too short
     expect(bad('KIC12345678').key).toBeTruthy() // 11 chars

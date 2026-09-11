@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/VincentApta/Kicca/api/internal/auth"
-	"github.com/VincentApta/Kicca/api/internal/models"
+	"github.com/VincentApta/Kica/api/internal/auth"
+	"github.com/VincentApta/Kica/api/internal/models"
 )
 
 const (

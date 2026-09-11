@@ -1,4 +1,4 @@
-# Architecture — kicca
+# Architecture — kica
 
 Single repo, three services in Compose. See [[brief]], [[domain]], [[api-contract]].
 
@@ -23,11 +23,11 @@ flowchart LR
 | api | golang:1.23-alpine build → scratch/distroless | Fiber + GORM, env config, health `/api/health` |
 | web | node:22-alpine build → nginx:alpine | Vite SPA, static, `try_files` history fallback |
 | postgres | postgres:17-alpine | volume `pgdata`, healthcheck pg_isready |
-| caddy | caddy:2-alpine | single port :80, `/api/*`→api, rest→web. `ponytail:` TLS + kicca.apta.works at deploy time |
+| caddy | caddy:2-alpine | single port :80, `/api/*`→api, rest→web. `ponytail:` TLS + kica.apta.works at deploy time |
 
 ## Repo layout (single repo)
 ```
-kicca/
+kica/
   api/          # Go module
     cmd/server/main.go
     internal/{config,db,models,middleware,handlers,auth,github,services}
@@ -42,7 +42,7 @@ kicca/
 ```
 
 ## Auth
-JWT (HS256), 12h expiry, httpOnly cookie `kicca_session`, SameSite=Lax. Login refreshes. Middleware: parse JWT → load user → reject disabled. CSRF: SameSite=Lax + JSON-only APIs (no form posts) is v1 stance.
+JWT (HS256), 12h expiry, httpOnly cookie `kica_session`, SameSite=Lax. Login refreshes. Middleware: parse JWT → load user → reject disabled. CSRF: SameSite=Lax + JSON-only APIs (no form posts) is v1 stance.
 
 ## Config (env)
 `DATABASE_URL`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (seed on first boot), `GITHUB_API_BASE` (default https://api.github.com, overridable for tests).
@@ -54,7 +54,7 @@ api holds PAT per project (AES-256-GCM, key = env `GH_ENC_KEY` 32 bytes base64).
 Fractional float position per (project, status). Rebalance column when neighbor gap < 1 (rewrite all positions in that column as 1024-spaced). Single transaction.
 
 ## Deployment
-Local-first. Later: same compose behind real Caddy with TLS on a VM, domain kicca.apta.works. Backups = `pg_dump` cron; PATs encrypted at rest so dumps safe-ish, still protect them.
+Local-first. Later: same compose behind real Caddy with TLS on a VM, domain kica.apta.works. Backups = `pg_dump` cron; PATs encrypted at rest so dumps safe-ish, still protect them.
 
 ## Testing stance
 - api: `go test` — auth, permissions matrix, position math, task numbering, GH link idempotency (mock HTTP).

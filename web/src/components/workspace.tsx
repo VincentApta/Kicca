@@ -62,7 +62,7 @@ export function Workspace() {
         setProjects(data)
         let first: string | null = data[0]?.id ?? null
         try {
-          const stored = localStorage.getItem('kicca-project')
+          const stored = localStorage.getItem('kica-project')
           if (stored && data.some((p) => p.id === stored)) first = stored
         } catch {
           // ignore
@@ -238,7 +238,7 @@ export function Workspace() {
     setCurrentProjectId(id)
     setDrawerId(null)
     try {
-      localStorage.setItem('kicca-project', id)
+      localStorage.setItem('kica-project', id)
     } catch {
       // ignore
     }

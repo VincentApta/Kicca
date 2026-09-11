@@ -1,4 +1,4 @@
-# Tickets — kicca
+# Tickets — kica
 
 Single repo, single Claude Code agent, sequential batches. GitHub flow: Issue → Branch → PR → Review → Merge. No direct commits to main.
 
@@ -11,6 +11,6 @@ Single repo, single Claude Code agent, sequential batches. GitHub flow: Issue �
 | T5 | Board UI | sidebar, project switcher, board columns + dnd-kit drag/move, card, detail drawer, list view + filters, empty/loading/error states, theme toggle | T1, T4 (mock API until ready) |
 | T6 | Admin UI | users/teams/projects management screens, project members + labels settings | T5 |
 | T7 | GitHub integration | GH config endpoint (AES-GCM encrypt PAT), create-issue service + endpoint, link display, idempotency, mocked upstream tests | T4 |
-| T8 | Hardening + docs | permission e2e pass, seed demo script optional, README (run/deploy), Compose prod notes (Caddy TLS kicca.apta.works), backup pg_dump note | T5, T6, T7 |
+| T8 | Hardening + docs | permission e2e pass, seed demo script optional, README (run/deploy), Compose prod notes (Caddy TLS kica.apta.works), backup pg_dump note | T5, T6, T7 |
 
 Rules: each ticket = one Issue + one PR; agent runs `go build/test` + `npm run build` before handoff; Hermes verifies independently before merge. Vault docs updated first if scope changes ([[PRD]] · [[api-contract]] · [[DESIGN]]).

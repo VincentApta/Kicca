@@ -1,4 +1,4 @@
-// Package models holds GORM entities for kicca.
+// Package models holds GORM entities for kica.
 package models
 
 import (

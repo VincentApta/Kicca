@@ -1,5 +1,5 @@
 // Typed API client — paths and shapes per docs/api-contract.md.
-// Cookie session: same-origin fetch sends kicca_session automatically.
+// Cookie session: same-origin fetch sends kica_session automatically.
 
 import type {
   ClientProjectRef,

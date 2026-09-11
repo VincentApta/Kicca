@@ -1,4 +1,4 @@
-# kicca edge. ponytail: TLS + kicca.apta.works at deploy time.
+# kica edge. ponytail: TLS + kica.apta.works at deploy time.
 :80 {
 	handle /api/* {
 		reverse_proxy api:8080

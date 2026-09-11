@@ -1,4 +1,4 @@
-# kicca — Project Brief
+# kica — Project Brief
 
 One-pager. Source of truth = this vault folder. [[PRD]] · [[DESIGN]] · [[architecture]] · [[domain]] · [[api-contract]] · [[tickets]]
 
@@ -14,11 +14,11 @@ Helpdesk/ticketing intake: embedded public form on client apps → dumps into In
 ## Stack
 - **Backend:** Go (Fiber + GORM), PostgreSQL, JWT httpOnly-cookie auth, bcrypt
 - **Frontend:** React + TypeScript + Vite, Tailwind, shadcn/ui (Base UI), dnd-kit
-- **Infra:** single repo (`kicca/` → `api/` + `web/`), Docker Compose (postgres, api, caddy)
+- **Infra:** single repo (`kica/` → `api/` + `web/`), Docker Compose (postgres, api, caddy)
 - **Integrations:** GitHub REST API v3, PAT per project, AES-256-GCM encrypted at rest
 
 ## Hosting
-Eventually `kicca.apta.works`. Local dev first. Name "kicca" provisional — may change.
+Eventually `kica.apta.works`. Local dev first. Name "kica" provisional — may change.
 
 ## Constraints
 - Auth: local email+password, admin-managed users (no OAuth v1)

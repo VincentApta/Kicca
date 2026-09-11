@@ -1,13 +1,13 @@
-// kicca api server.
+// kica api server.
 package main
 
 import (
 	"log"
 
-	"github.com/VincentApta/Kicca/api/internal/config"
-	"github.com/VincentApta/Kicca/api/internal/db"
-	"github.com/VincentApta/Kicca/api/internal/github"
-	"github.com/VincentApta/Kicca/api/internal/handlers"
+	"github.com/VincentApta/Kica/api/internal/config"
+	"github.com/VincentApta/Kica/api/internal/db"
+	"github.com/VincentApta/Kica/api/internal/github"
+	"github.com/VincentApta/Kica/api/internal/handlers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
@@ -33,7 +33,7 @@ func main() {
 	app.Use(recover.New())
 	handlers.Register(app, gdb, cfg.JWTSecret, ghEncKey)
 
-	log.Printf("kicca api listening on :%s (migrations applied: %d, %s)", cfg.Port, migrations, cfg)
+	log.Printf("kica api listening on :%s (migrations applied: %d, %s)", cfg.Port, migrations, cfg)
 	if err := app.Listen(":" + cfg.Port); err != nil {
 		log.Fatalf("listen: %v", err)
 	}

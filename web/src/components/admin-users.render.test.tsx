@@ -9,9 +9,9 @@ import { UsersPage } from './admin-pages'
 import type { User } from '@/lib/types'
 
 const users: User[] = [
-  { id: 'u1', email: 'root@kicca.dev', name: 'Root Admin', global_role: 'admin' },
-  { id: 'u2', email: 'ada@kicca.dev', name: 'Ada Lovelace', global_role: 'member' },
-  { id: 'u3', email: 'grace@kicca.dev', name: 'Grace Hopper', global_role: 'member' },
+  { id: 'u1', email: 'root@kica.dev', name: 'Root Admin', global_role: 'admin' },
+  { id: 'u2', email: 'ada@kica.dev', name: 'Ada Lovelace', global_role: 'member' },
+  { id: 'u3', email: 'grace@kica.dev', name: 'Grace Hopper', global_role: 'member' },
 ]
 
 function json(body: unknown, status = 200) {
@@ -60,7 +60,7 @@ describe('UsersPage render', () => {
     for (const h of ['Name', 'Email', 'Role', 'Status']) {
       expect(text).toContain(h)
     }
-    expect(text).toContain('ada@kicca.dev')
+    expect(text).toContain('ada@kica.dev')
     expect(text).toContain('Ada Lovelace')
     expect(text).toContain('Admin')
     expect(text).toContain('Active')

@@ -1,4 +1,4 @@
-# PRD — kicca
+# PRD — kica
 
 Internal task manager for the company. v1 = team task management. See [[brief]] for one-pager, [[DESIGN]] for UI, [[domain]] for entities.
 

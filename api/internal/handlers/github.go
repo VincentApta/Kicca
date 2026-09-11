@@ -11,8 +11,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 
-	"github.com/VincentApta/Kicca/api/internal/github"
-	"github.com/VincentApta/Kicca/api/internal/models"
+	"github.com/VincentApta/Kica/api/internal/github"
+	"github.com/VincentApta/Kica/api/internal/models"
 )
 
 // ghRepoRe: `owner/name` — GitHub allows [A-Za-z0-9_.-] in both halves.
@@ -118,7 +118,7 @@ func CreateTaskIssue(gdb *gorm.DB, encKey *[32]byte) fiber.Handler {
 // original ticket description is preserved as quoted context. Falls back to
 // description alone when no assessment exists yet.
 func issueBody(projectKey string, t *models.Task) string {
-	ref := "\n\n---\n\nCreated from kicca task " + projectKey + "-" + strconv.FormatInt(t.Number, 10)
+	ref := "\n\n---\n\nCreated from kica task " + projectKey + "-" + strconv.FormatInt(t.Number, 10)
 	if strings.TrimSpace(t.Assessment) != "" {
 		return t.Assessment +
 			"\n\n---\n\n**Original ticket**\n\n> " +

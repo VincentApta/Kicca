@@ -1,4 +1,4 @@
-# DESIGN — kicca
+# DESIGN — kica
 
 ## Design Read
 

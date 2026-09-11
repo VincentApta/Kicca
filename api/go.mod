@@ -1,4 +1,4 @@
-module github.com/VincentApta/Kicca/api
+module github.com/VincentApta/Kica/api
 
 go 1.23
 

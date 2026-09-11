@@ -47,7 +47,7 @@ func newProjectFixture(t *testing.T, app *fiber.App) projectFixture {
 	f.teamID = team["id"].(string)
 
 	status, body, _ := do(t, app, http.MethodPost, "/api/projects",
-		`{"team_id":"`+f.teamID+`","name":"Kicca","key":"KIC"}`, f.admin)
+		`{"team_id":"`+f.teamID+`","name":"Kica","key":"KIC"}`, f.admin)
 	if status != http.StatusCreated {
 		t.Fatalf("create project: got %d %v", status, body)
 	}
@@ -246,7 +246,7 @@ func TestProjectKeyValidation(t *testing.T) {
 	}
 
 	status, body, _ := do(t, app, http.MethodPost, "/api/projects",
-		`{"team_id":"`+teamID+`","name":"Kicca","key":"KIC"}`, admin)
+		`{"team_id":"`+teamID+`","name":"Kica","key":"KIC"}`, admin)
 	if status != http.StatusCreated || body["key"] != "KIC" || body["team_id"] != teamID {
 		t.Fatalf("create: got %d %v", status, body)
 	}
@@ -387,8 +387,8 @@ func TestProjectPatchDelete(t *testing.T) {
 	f := newProjectFixture(t, app)
 
 	status, body, _ := do(t, app, http.MethodPatch, "/api/projects/"+f.projectID,
-		`{"name":"Kicca 2","description":"desc","key":"KIC2"}`, f.admin)
-	if status != http.StatusOK || body["name"] != "Kicca 2" || body["key"] != "KIC2" || body["description"] != "desc" {
+		`{"name":"Kica 2","description":"desc","key":"KIC2"}`, f.admin)
+	if status != http.StatusOK || body["name"] != "Kica 2" || body["key"] != "KIC2" || body["description"] != "desc" {
 		t.Fatalf("patch: got %d %v", status, body)
 	}
 

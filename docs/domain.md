@@ -1,4 +1,4 @@
-# Domain Model — kicca
+# Domain Model — kica
 
 Entities, relationships, rules. See [[PRD]] for scope, [[api-contract]] for wire format.
 

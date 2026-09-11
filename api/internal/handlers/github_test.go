@@ -14,8 +14,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 
-	"github.com/VincentApta/Kicca/api/internal/github"
-	"github.com/VincentApta/Kicca/api/internal/models"
+	"github.com/VincentApta/Kica/api/internal/github"
+	"github.com/VincentApta/Kica/api/internal/models"
 )
 
 // ghMock is a programmable GitHub upstream: sequential status codes per
@@ -139,7 +139,7 @@ func TestGithubIssueCreateSuccess(t *testing.T) {
 	}
 	if !strings.Contains(upBody, `"title":"Fix login bug"`) ||
 		!strings.Contains(upBody, "Steps to reproduce here.") ||
-		!strings.Contains(upBody, "Created from kicca task APP-1") {
+		!strings.Contains(upBody, "Created from kica task APP-1") {
 		t.Fatalf("upstream body: %s", upBody)
 	}
 	if mock.count() != 1 {

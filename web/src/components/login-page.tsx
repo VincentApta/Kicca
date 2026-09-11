@@ -45,7 +45,7 @@ export function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-background p-8">
       <div className="flex w-full max-w-md flex-col items-center gap-8">
         <header className="text-center">
-          <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">kicca</h1>
+          <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">kica</h1>
           <p className="mt-2 text-sm text-muted-foreground">Tasks, triage and delivery — in one place.</p>
         </header>
         <div className="card-neu w-full p-8">

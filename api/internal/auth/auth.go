@@ -1,4 +1,4 @@
-// Package auth: session JWT (HS256, 12h) and password hashing for kicca.
+// Package auth: session JWT (HS256, 12h) and password hashing for kica.
 package auth
 
 import (
@@ -11,7 +11,7 @@ import (
 
 const (
 	// CookieName is the httpOnly session cookie per docs/architecture.md.
-	CookieName = "kicca_session"
+	CookieName = "kica_session"
 	// SessionTTL is the JWT lifetime; login refreshes it.
 	SessionTTL = 12 * time.Hour
 )
