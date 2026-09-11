@@ -36,6 +36,47 @@ func NewClient() *Client {
 	}
 }
 
+// uploadsBase mirrors base for the user-attachments host (tests point it at
+// their mock the same way as GITHUB_API_BASE).
+func uploadsBase() string {
+	if b := os.Getenv("GITHUB_UPLOADS_BASE"); b != "" {
+		return strings.TrimSuffix(b, "/")
+	}
+	return "https://uploads.github.com"
+}
+
+// UploadAttachment POSTs raw file bytes to /user/attachments and returns the
+// permanent browser_download_url (renders inline in issue bodies). No retry:
+// the caller skips the attachment on failure rather than failing the issue.
+func (c *Client) UploadAttachment(token, filename, contentType string, body io.Reader) (string, error) {
+	req, err := http.NewRequest(http.MethodPost, uploadsBase()+"/user/attachments", body)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", contentType)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("github uploads unreachable: %v", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", fmt.Errorf("read github response: %v", err)
+	}
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("github uploads returned %d", resp.StatusCode)
+	}
+	var out struct {
+		URL string `json:"browser_download_url"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil || out.URL == "" {
+		return "", fmt.Errorf("unexpected github uploads response shape")
+	}
+	return out.URL, nil
+}
+
 // CreateIssue POSTs /repos/{owner}/{name}/issues — title + markdown body,
 // PAT bearer auth. 10s timeout per attempt, exactly one retry on 5xx or
 // transport error (architecture: GitHub integration). Errors carry the

@@ -10,6 +10,14 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin-change-me}
       GH_ENC_KEY: ${GH_ENC_KEY:-}
       GITHUB_API_BASE: ${GITHUB_API_BASE:-https://api.github.com}
+      # task attachments (#34): S3 when S3_BUCKET set, else local volume
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      ATTACHMENTS_DIR: /data/attachments
+      ATTACHMENTS_MAX_MB: ${ATTACHMENTS_MAX_MB:-25}
+    volumes:
+      - attachments:/data/attachments
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,3 +59,4 @@ services:
 
 volumes:
   pgdata:
+  attachments:

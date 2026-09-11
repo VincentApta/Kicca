@@ -65,15 +65,20 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | POST | /tasks/:id/restore | — | back to backlog |
 | POST | /tasks/:id/move | `{status, before_task_id?, after_task_id?}` | server computes position; stamps analytics (rule 8) |
 | GET/POST | /tasks/:id/comments | `{body}` | |
+| GET/POST | /tasks/:id/attachments | multipart `file` (images png/jpeg/webp/gif, videos mp4/mov/webm) | type sniffed server-side; size capped ATTACHMENTS_MAX_MB (default 25MB); 422 otherwise |
+| GET | /attachments/:id | — | streams blob (Content-Type sniffed, inline); team via project visibility, client via created_by |
+| DELETE | /attachments/:id | — | team only (project visibility); 204 |
 
 `task` = `{id, project_id, number, title, description, status, priority, type, estimate, assignee?: user|null, labels: [{id,name,color}], due_date, position, started_at, done_at, created_by, created_at, updated_at, gh_link?: {repo, issue_number, issue_url}|null}`.
+
+`attachment` (team) = `{id, task_id, filename, content_type, size_bytes, created_by, created_at}`. Storage backend (S3 when S3_BUCKET set, else ATTACHMENTS_DIR local) never surfaces; object_key stays server-side. Issue creation from a task uploads each attachment to github.com/user-attachments and embeds the permanent URL (images `![](url)`, videos bare URL) in the issue body.
 
 Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `started_at`/`done_at` = server-stamped analytics timestamps (rule 8, not client-settable).
 
 ### GitHub
 | Method | Path | Notes |
 |---|---|---|
-| POST | /tasks/:id/github/issue | creates GH issue from task; 201 `{repo, issue_number, issue_url}`; 409 already linked; 422 project not configured; 502 upstream error |
+| POST | /tasks/:id/github/issue | creates GH issue from task (attachments embedded, see Tasks); 201 `{repo, issue_number, issue_url}`; 409 already linked; 422 project not configured; 502 upstream error |
 
 ### Client portal (client role only — team users get 403)
 | Method | Path | Body | Notes |
@@ -81,8 +86,11 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 | GET | /client/projects | — | linked projects: `{data: [{id, key, name}]}` |
 | POST | /client/tickets | `{project_id, title, description}` | 201 ticket → task status=inbox, created_by=client, per-project numbering; unlinked project 404 (no leak) |
 | GET | /client/tickets | ?page | own tickets (created_by=me, linked projects), newest-updated first |
+| GET/POST | /client/tickets/:id/attachments | multipart `file` | own tickets only; listing/streaming limited to attachments the client created |
 
 `client ticket` = `{id, project_id, project_key, number, title, description, status, created_at, updated_at}` — assessment and other team-only fields are never serialized.
+
+`client attachment` = `{id, filename, content_type, size_bytes, created_at}` — minimal fields only; created_by and task_id never serialize on the client surface.
 
 ### Misc
 | Method | Path | Notes |
