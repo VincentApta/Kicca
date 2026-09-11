@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile.api
     environment:
-      DATABASE_URL: postgres://kica:${POSTGRES_PASSWORD:-kica}@postgres:5432/kica?sslmode=disable
+      DATABASE_URL: postgres://kicca:${POSTGRES_PASSWORD:-kicca}@postgres:5432/kicca?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin-change-me}
@@ -24,13 +24,15 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: kica
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kica}
-      POSTGRES_DB: kica
+      # ponytail: cluster inside the migrated pgdata volume still uses the
+      # old kicca user/db — env vars must match it until the volume is rebuilt.
+      POSTGRES_USER: kicca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kicca}
+      POSTGRES_DB: kicca
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kica -d kica"]
+      test: ["CMD-SHELL", "pg_isready -U kicca -d kicca"]
       interval: 5s
       timeout: 3s
       retries: 10
