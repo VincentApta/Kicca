@@ -56,7 +56,7 @@ func uploadsBase() string {
 func (c *Client) UploadAttachment(token, filename, contentType string, body io.Reader) (string, error) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
-	fw, err := mw.CreateFormField("file")
+	fw, err := mw.CreateFormFile("file", filename)
 	if err != nil {
 		return "", fmt.Errorf("build multipart: %w", err)
 	}
@@ -68,9 +68,9 @@ func (c *Client) UploadAttachment(token, filename, contentType string, body io.R
 	}
 
 	name := url.QueryEscape(filename)
-	// ponytail: GitHub ignores the Content-Type of the multipart field — it
-	// sniffs the bytes server-side; the field's own type is not settable
-	// through CreateFormField without a Writer.SetField wrapper.
+	// GitHub ignores the multipart part's Content-Type and sniffs bytes
+	// server-side; CreateFormFile sends application/octet-stream, which the
+	// endpoint accepts.
 	req, err := http.NewRequest(http.MethodPost, uploadsBase()+"/user/attachments?name="+name, &buf)
 	if err != nil {
 		return "", fmt.Errorf("build request: %w", err)
