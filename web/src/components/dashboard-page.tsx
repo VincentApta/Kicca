@@ -270,26 +270,22 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
         )}
       </section>
 
-      {/* row 3 — burndown + throughput */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* row 3 — burndown + throughput + CFD */}
+      <div className="grid gap-6 lg:grid-cols-3">
         <section className="card-neu" aria-label="Burndown">
           <h2 className="mb-4 text-sm font-medium text-foreground">
-            Burndown — last 30d <span className="text-muted-foreground">({burn.mode})</span>
+            Burndown — 30d <span className="text-muted-foreground">({burn.mode})</span>
           </h2>
           <BurnChart actual={burn.actual} ideal={burn.ideal} mode={burn.mode} />
         </section>
         <section className="card-neu" aria-label="Throughput">
-          <h2 className="mb-4 text-sm font-medium text-foreground">Throughput — done/day, 14d</h2>
+          <h2 className="mb-4 text-sm font-medium text-foreground">Throughput — 14d</h2>
           <BarChart data={bars} label="Throughput" />
         </section>
-      </div>
-
-      {/* row 4 — CFD (half width) */}
-      <div className="grid gap-6 lg:grid-cols-2">
         <section className="card-neu" aria-label="Cumulative flow diagram">
           <h2 className="mb-4 text-sm font-medium text-foreground">
             Cumulative flow — 30d
-            <span className="ml-3 inline-flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="ml-2 inline-flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-in-progress" />created</span>
               <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-done" />done</span>
             </span>
@@ -298,8 +294,8 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
         </section>
       </div>
 
-      {/* row 3 — cycle histogram + aging wip */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* row 4 — cycle histogram + aging wip + type mix */}
+      <div className="grid gap-6 lg:grid-cols-3">
         <section className="card-neu" aria-label="Cycle time distribution">
           <h2 className="mb-4 text-sm font-medium text-foreground">Cycle time distribution</h2>
           <ul className="space-y-3">
@@ -338,10 +334,30 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
             </ul>
           )}
         </section>
+
+        <section className="card-neu" aria-label="Type mix">
+          <h2 className="mb-4 text-sm font-medium text-foreground">Type mix</h2>
+          {/* stacked bar */}
+          <div className="inset-neu flex h-4 overflow-hidden rounded-md p-0.5">
+            {typeMix.map((m) =>
+              m.count > 0 ? (
+                <div key={m.key} className={TYPE_FILL[m.key]} style={{ width: `${(m.count / typeTotal) * 100}%` }} />
+              ) : null,
+            )}
+          </div>
+          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5">
+            {typeMix.map((m) => (
+              <li key={m.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className={`size-2 rounded-full ${TYPE_FILL[m.key]}`} />
+                {TYPE_LABELS[m.key]} · <span className="font-mono">{m.count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
 
-      {/* row 4 — status meters + workload + attention + type mix */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* row 5 — status + workload + attention */}
+      <div className="grid gap-6 lg:grid-cols-3">
         <section className="card-neu" aria-label="Open tasks by status">
           <h2 className="mb-4 text-sm font-medium text-foreground">Open tasks by status</h2>
           {byStatus.length === 0 ? (
@@ -420,26 +436,6 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
               ))}
             </ul>
           )}
-        </section>
-
-        <section className="card-neu" aria-label="Type mix">
-          <h2 className="mb-4 text-sm font-medium text-foreground">Type mix</h2>
-          {/* stacked bar */}
-          <div className="inset-neu flex h-4 overflow-hidden rounded-md p-0.5">
-            {typeMix.map((m) =>
-              m.count > 0 ? (
-                <div key={m.key} className={TYPE_FILL[m.key]} style={{ width: `${(m.count / typeTotal) * 100}%` }} />
-              ) : null,
-            )}
-          </div>
-          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5">
-            {typeMix.map((m) => (
-              <li key={m.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={`size-2 rounded-full ${TYPE_FILL[m.key]}`} />
-                {TYPE_LABELS[m.key]} · <span className="font-mono">{m.count}</span>
-              </li>
-            ))}
-          </ul>
         </section>
       </div>
     </div>
