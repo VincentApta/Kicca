@@ -15,6 +15,7 @@ import type {
   Status,
   Task,
   TaskCreate,
+  TaskEventsDay,
   TaskPatch,
   Team,
   User,
