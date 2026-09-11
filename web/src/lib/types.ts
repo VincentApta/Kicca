@@ -11,7 +11,7 @@ export type Status =
 
 export type Priority = 'urgent' | 'high' | 'medium' | 'low'
 export type TaskType = 'task' | 'bug' | 'feature' | 'chore'
-export type GlobalRole = 'admin' | 'member'
+export type GlobalRole = 'admin' | 'member' | 'client'
 export type ProjectRole = 'project_admin' | 'member'
 
 export type User = {
@@ -19,6 +19,7 @@ export type User = {
   email: string
   name: string
   global_role: GlobalRole
+  project_ids?: string[] // client role only, admin user-management responses
 }
 
 export type UserCreate = {
@@ -26,6 +27,7 @@ export type UserCreate = {
   name: string
   password: string
   global_role: GlobalRole
+  project_ids?: string[] // client only: projects they may submit tickets into
 }
 
 export type UserPatch = Partial<{
@@ -33,6 +35,7 @@ export type UserPatch = Partial<{
   global_role: GlobalRole
   password: string
   disabled: boolean
+  project_ids: string[] // client only: replaces the link set
 }>
 
 export type Project = {
@@ -146,4 +149,23 @@ export type TaskPatch = Partial<{
 export type TaskEventsDay = {
   date: string // YYYY-MM-DD
   counts: Record<string, number>
+}
+
+/** GET /api/client/projects — linked project for the submit-form picker. */
+export type ClientProjectRef = { id: string; key: string; name: string }
+
+/**
+ * GET /api/client/tickets — own tickets, read-only tracking. Deliberately no
+ * assessment/assignee/labels: team-only fields never reach the client.
+ */
+export type ClientTicket = {
+  id: string
+  project_id: string
+  project_key: string
+  number: number
+  title: string
+  description: string
+  status: Status
+  created_at: string
+  updated_at: string
 }

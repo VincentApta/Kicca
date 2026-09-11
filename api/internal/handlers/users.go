@@ -19,20 +19,25 @@ const (
 	defaultPerPage = 50
 	roleAdmin      = "admin"
 	roleMember     = "member"
+	roleClient     = "client"
 )
 
+var validRoles = map[string]bool{roleAdmin: true, roleMember: true, roleClient: true}
+
 type createUserReq struct {
-	Email      string `json:"email"`
-	Name       string `json:"name"`
-	Password   string `json:"password"`
-	GlobalRole string `json:"global_role"`
+	Email      string   `json:"email"`
+	Name       string   `json:"name"`
+	Password   string   `json:"password"`
+	GlobalRole string   `json:"global_role"`
+	ProjectIDs []string `json:"project_ids"` // client only: projects they may submit tickets into
 }
 
 type patchUserReq struct {
-	Name       *string `json:"name"`
-	GlobalRole *string `json:"global_role"`
-	Password   *string `json:"password"`
-	Disabled   *bool   `json:"disabled"`
+	Name       *string  `json:"name"`
+	GlobalRole *string  `json:"global_role"`
+	Password   *string  `json:"password"`
+	Disabled   *bool    `json:"disabled"`
+	ProjectIDs []string `json:"project_ids"` // client only: non-nil replaces the link set
 }
 
 // ListUsers: GET /api/users?page=&per_page= → {data, page, per_page, total}.
@@ -52,6 +57,7 @@ func ListUsers(gdb *gorm.DB) fiber.Handler {
 		for i := range users {
 			data[i] = toUserJSON(&users[i])
 		}
+		attachClientProjectIDs(gdb, data)
 		return c.JSON(fiber.Map{"data": data, "page": page, "per_page": perPage, "total": total})
 	}
 }
@@ -71,8 +77,14 @@ func CreateUser(gdb *gorm.DB) fiber.Handler {
 		if !strings.Contains(req.Email, "@") || req.Name == "" || req.Password == "" {
 			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "email, name and password are required")
 		}
-		if req.GlobalRole != roleAdmin && req.GlobalRole != roleMember {
-			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "global_role must be admin or member")
+		if !validRoles[req.GlobalRole] {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "global_role must be admin, member or client")
+		}
+		if req.GlobalRole == roleClient {
+			req.ProjectIDs = dedupeIDs(req.ProjectIDs)
+			if len(req.ProjectIDs) == 0 {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "a client must be linked to at least one project")
+			}
 		}
 		hash, err := auth.HashPassword(req.Password)
 		if err != nil {
@@ -85,7 +97,16 @@ func CreateUser(gdb *gorm.DB) fiber.Handler {
 			}
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create user")
 		}
-		return c.Status(fiber.StatusCreated).JSON(toUserJSON(user))
+		if req.GlobalRole == roleClient {
+			if err := linkClientProjects(gdb, user.ID, req.ProjectIDs); err != nil {
+				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not link client projects")
+			}
+		}
+		out := toUserJSON(user)
+		if req.GlobalRole == roleClient {
+			out.ProjectIDs = req.ProjectIDs
+		}
+		return c.Status(fiber.StatusCreated).JSON(out)
 	}
 }
 
@@ -112,12 +133,40 @@ func PatchUser(gdb *gorm.DB) fiber.Handler {
 			}
 			updates["name"] = strings.TrimSpace(*req.Name)
 		}
+		finalRole := user.GlobalRole
 		if req.GlobalRole != nil {
-			if *req.GlobalRole != roleAdmin && *req.GlobalRole != roleMember {
-				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "global_role must be admin or member")
+			if !validRoles[*req.GlobalRole] {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "global_role must be admin, member or client")
 			}
 			updates["global_role"] = *req.GlobalRole
+			finalRole = *req.GlobalRole
 		}
+		// client link management: non-nil project_ids replaces the set; a
+		// client must always keep >= 1 link; leaving the client role drops
+		// stale links.
+		replaceLinks := false
+		if req.ProjectIDs != nil {
+			if finalRole != roleClient {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "project_ids only applies to the client role")
+			}
+			req.ProjectIDs = dedupeIDs(req.ProjectIDs)
+			if len(req.ProjectIDs) == 0 {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "a client must be linked to at least one project")
+			}
+			if err := validateProjectIDs(gdb, req.ProjectIDs); err != nil {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "project_ids must reference existing projects")
+			}
+			replaceLinks = true
+		} else if finalRole == roleClient && user.GlobalRole != roleClient {
+			var links int64
+			if err := gdb.Model(&models.ClientProject{}).Where("client_id = ?", user.ID).Count(&links).Error; err != nil {
+				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not count client projects")
+			}
+			if links == 0 {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "a client must be linked to at least one project")
+			}
+		}
+		dropLinks := user.GlobalRole == roleClient && finalRole != roleClient
 		if req.Password != nil {
 			if *req.Password == "" {
 				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "password must not be empty")
@@ -159,7 +208,27 @@ func PatchUser(gdb *gorm.DB) fiber.Handler {
 				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not reload user")
 			}
 		}
-		return c.JSON(toUserJSON(&user))
+		if replaceLinks || dropLinks {
+			err := gdb.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Where("client_id = ?", user.ID).Delete(&models.ClientProject{}).Error; err != nil {
+					return err
+				}
+				if replaceLinks {
+					return linkClientProjects(tx, user.ID, req.ProjectIDs)
+				}
+				return nil
+			})
+			if err != nil {
+				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not update client projects")
+			}
+		}
+		out := toUserJSON(&user)
+		if finalRole == roleClient {
+			if ids, err := linkedProjectIDs(gdb, user.ID); err == nil {
+				out.ProjectIDs = ids
+			}
+		}
+		return c.JSON(out)
 	}
 }
 
@@ -178,4 +247,72 @@ func isUniqueViolation(err error) bool {
 	}
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "duplicate key") || strings.Contains(s, "unique constraint")
+}
+
+// dedupeIDs preserves order, drops repeats (client_projects PK safety).
+func dedupeIDs(ids []string) []string {
+	seen := make(map[string]bool, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// validateProjectIDs: uuids referencing existing projects.
+func validateProjectIDs(gdb *gorm.DB, ids []string) error {
+	for _, pid := range ids {
+		if _, err := uuid.Parse(pid); err != nil {
+			return err
+		}
+	}
+	var count int64
+	if err := gdb.Model(&models.Project{}).Where("id IN ?", ids).Count(&count).Error; err != nil {
+		return err
+	}
+	if count != int64(len(ids)) {
+		return errors.New("one or more projects not found")
+	}
+	return nil
+}
+
+// attachClientProjectIDs fills ProjectIDs on any client-role rows (one
+// batched query) so the admin Users page can preselect the link editor.
+func attachClientProjectIDs(gdb *gorm.DB, users []userJSON) {
+	clientIDs := make([]string, 0, len(users))
+	for i := range users {
+		if users[i].GlobalRole == roleClient {
+			clientIDs = append(clientIDs, users[i].ID)
+		}
+	}
+	if len(clientIDs) == 0 {
+		return
+	}
+	var links []models.ClientProject
+	if err := gdb.Where("client_id IN ?", clientIDs).Find(&links).Error; err != nil {
+		return
+	}
+	byClient := map[string][]string{}
+	for _, l := range links {
+		byClient[l.ClientID] = append(byClient[l.ClientID], l.ProjectID)
+	}
+	for i := range users {
+		users[i].ProjectIDs = byClient[users[i].ID] // nil for non-clients → omitted
+	}
+}
+
+// linkClientProjects inserts the client_projects rows. Validates each project
+// exists; inside a caller transaction any failure rolls the whole thing back.
+func linkClientProjects(gdb *gorm.DB, clientID string, projectIDs []string) error {
+	if err := validateProjectIDs(gdb, projectIDs); err != nil {
+		return err
+	}
+	rows := make([]models.ClientProject, 0, len(projectIDs))
+	for _, pid := range projectIDs {
+		rows = append(rows, models.ClientProject{ClientID: clientID, ProjectID: pid})
+	}
+	return gdb.Create(&rows).Error
 }

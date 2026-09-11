@@ -1,0 +1,292 @@
+// Client portal (#32): the whole app surface for global_role=client — submit
+// tickets into linked projects, track own tickets read-only. No board, no
+// team nav; assessment and other team-only fields are never rendered (the
+// API doesn't even send them).
+import { useEffect, useState, type FormEvent } from 'react'
+import { LogOutIcon, PlusIcon, TicketIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api'
+import { useAuth } from '@/lib/auth'
+import { STATUS_LABELS } from '@/lib/labels'
+import { useToast } from '@/lib/toast'
+import type { ClientProjectRef, ClientTicket, Status } from '@/lib/types'
+
+// Same palette as my-tasks-page pills.
+const STATUS_COLORS: Record<string, string> = {
+  inbox: 'text-muted-foreground/70 bg-muted/30 border-border/40',
+  backlog: 'text-blue-400/80 bg-blue-900/15 border-blue-400/25',
+  in_progress: 'text-amber-400 bg-amber-900/20 border-amber-400/30',
+  review: 'text-violet-400 bg-violet-900/15 border-violet-400/25',
+  done: 'text-emerald-400 bg-emerald-900/15 border-emerald-400/25',
+  blocked: 'text-red-400 bg-red-900/15 border-red-400/25',
+  trash: 'text-muted-foreground/40 bg-muted/10 border-border/30 line-through',
+}
+
+function StatusChip({ status }: { status: Status }) {
+  return (
+    <span
+      className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[status] ?? STATUS_COLORS.inbox}`}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  )
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+export function ClientPortal() {
+  const { state, logout } = useAuth()
+  const toast = useToast()
+  const me = state.phase === 'authenticated' ? state.user : null
+
+  const [projects, setProjects] = useState<ClientProjectRef[] | null>(null)
+  const [tickets, setTickets] = useState<ClientTicket[] | null>(null)
+  const [detail, setDetail] = useState<ClientTicket | null>(null)
+
+  // submit form
+  const [projectId, setProjectId] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [errors, setErrors] = useState<{ title?: string; project?: string }>({})
+  const [busy, setBusy] = useState(false)
+
+  function refreshTickets() {
+    api.clientListTickets().then(
+      ({ data }) => setTickets(data),
+      () => setTickets([]),
+    )
+  }
+
+  useEffect(() => {
+    api.clientListProjects().then(
+      ({ data }) => {
+        setProjects(data)
+        setProjectId(data[0]?.id ?? null)
+      },
+      () => setProjects([]),
+    )
+    refreshTickets()
+  }, [])
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const errs: typeof errors = {}
+    if (!projectId) errs.project = 'Pick a project.'
+    if (!title.trim()) errs.title = 'Title is required.'
+    setErrors(errs)
+    if (Object.keys(errs).length > 0) return
+    setBusy(true)
+    try {
+      await api.clientCreateTicket({
+        project_id: projectId!,
+        title: title.trim(),
+        description: description.trim(),
+      })
+      toast('Ticket submitted — the team will pick it up from the Inbox')
+      setTitle('')
+      setDescription('')
+      refreshTickets()
+    } catch {
+      setErrors({ title: 'Could not submit the ticket. Try again.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-background px-6">
+        <span className="inset-neu flex size-8 items-center justify-center rounded-lg">
+          <TicketIcon className="size-4 text-primary" strokeWidth={1.5} />
+        </span>
+        <span className="font-heading font-semibold text-foreground">kicca</span>
+        <span className="ml-2 hidden text-sm text-muted-foreground sm:inline">
+          Support portal
+        </span>
+        <div className="ml-auto flex items-center gap-3">
+          {me && (
+            <span className="text-sm text-muted-foreground">
+              {me.name} <span className="font-mono text-xs">({me.email})</span>
+            </span>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => void logout()}>
+            <LogOutIcon strokeWidth={1.5} />
+            Log out
+          </Button>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-5xl gap-6 p-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        {/* ---- submit form ---- */}
+        <section className="card-neu flex flex-col gap-4 p-5">
+          <h1 className="font-heading text-lg font-semibold text-foreground">
+            New ticket
+          </h1>
+          <form className="flex flex-col gap-4" onSubmit={submit}>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ticket-project">Project</Label>
+              <Select
+                id="ticket-project"
+                value={projectId}
+                onValueChange={(v) => setProjectId(v ?? null)}
+                disabled={(projects?.length ?? 0) === 0}
+              >
+                <SelectTrigger className="inset-neu w-full border-0">
+                  <SelectValue placeholder={projects === null ? 'Loading…' : 'Pick a project'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(projects ?? []).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} · {p.key}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.project && (
+                <p role="alert" className="text-xs text-destructive">
+                  {errors.project}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ticket-title">Title</Label>
+              <Input
+                id="ticket-title"
+                className="inset-neu"
+                aria-invalid={!!errors.title}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Short summary of the problem"
+              />
+              {errors.title && (
+                <p role="alert" className="text-xs text-destructive">
+                  {errors.title}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="ticket-description">Description</Label>
+              <Textarea
+                id="ticket-description"
+                className="inset-neu min-h-32"
+                placeholder="What happened? What did you expect?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <Button type="submit" disabled={busy || projects === null}>
+              <PlusIcon strokeWidth={1.5} />
+              {busy ? 'Submitting…' : 'Submit ticket'}
+            </Button>
+          </form>
+          {projects?.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No projects linked to your account yet — ask the team to link one.
+            </p>
+          )}
+        </section>
+
+        {/* ---- my tickets ---- */}
+        <section className="card-neu flex flex-col gap-3 p-5">
+          <h2 className="font-heading text-lg font-semibold text-foreground">My tickets</h2>
+          {tickets === null && (
+            <div className="flex flex-col gap-2" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="inset-neu h-12 animate-pulse rounded-lg" />
+              ))}
+            </div>
+          )}
+          {tickets?.length === 0 && (
+            <p className="py-4 text-sm text-muted-foreground">
+              Nothing yet — your submitted tickets and their status show up here.
+            </p>
+          )}
+          <ul className="flex flex-col gap-2">
+            {(tickets ?? []).map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => setDetail(t)}
+                  className="inset-neu flex w-full flex-col gap-1.5 rounded-lg p-3 text-left transition-shadow hover:shadow-[var(--shadow-raised)]"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {t.project_key}-{t.number}
+                    </span>
+                    <StatusChip status={t.status} />
+                    <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">
+                      {fmtDate(t.updated_at)}
+                    </span>
+                  </div>
+                  <span className="truncate text-sm font-medium text-foreground">
+                    {t.title}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </main>
+
+      {/* ---- read-only detail ---- */}
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{detail?.title}</DialogTitle>
+            <DialogDescription>
+              {detail && (
+                <>
+                  <span className="font-mono">
+                    {detail.project_key}-{detail.number}
+                  </span>{' '}
+                  · submitted {fmtDate(detail.created_at)}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Status</span>
+                <StatusChip status={detail.status} />
+              </div>
+              <div className="inset-neu min-h-24 rounded-lg p-3">
+                <p className="whitespace-pre-wrap text-sm text-foreground">
+                  {detail.description || 'No description provided.'}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Last updated {fmtDate(detail.updated_at)}
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

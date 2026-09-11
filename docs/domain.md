@@ -11,7 +11,7 @@ Entities, relationships, rules. See [[PRD]] for scope, [[api-contract]] for wire
 | email | citext unique | login id |
 | password_hash | string | bcrypt |
 | name | string | |
-| global_role | enum(admin, member) | |
+| global_role | enum(admin, member, client) | client = portal-only (#32) |
 | disabled_at | timestamp null | soft disable; blocks login |
 
 ### Team
@@ -38,6 +38,9 @@ Entities, relationships, rules. See [[PRD]] for scope, [[api-contract]] for wire
 
 ### ProjectMember
 (project_id, user_id, role enum(project_admin, member)) PK. Multiple project_admins allowed.
+
+### ClientProject
+(client_id → users.id, project_id) PK (#32). Admin-managed links: the projects a client may submit tickets into. Clients have NO ProjectMember row — every team-scoped query excludes them by construction; role isolation is 403 both ways (team ↔ client).
 
 ### Task
 | Field | Type | Notes |
@@ -116,6 +119,8 @@ erDiagram
     Task ||--o{ Comment : ""
     User ||--o{ Comment : ""
     Task ||--o| GitHubIssueLink : ""
+    User ||--o{ ClientProject : ""
+    Project ||--o{ ClientProject : ""
 ```
 
 ## Rules
@@ -136,3 +141,4 @@ erDiagram
 
 7. **Disabled user:** existing JWT rejected at middleware check (disabled_at lookup), sessions effectively dead; assigned tasks keep assignee (shows name, greyed).
 8. **Analytics stamps:** first entry into in_progress/review sets started_at (never overwritten); entry into done sets done_at; leaving done clears it (re-done re-stamps). Every status change (create counts, from NULL) writes a task_events row in the same transaction.
+9. **Client tickets (#32):** a client submits tickets only into linked projects (ClientProject row, else 404 no-leak); each lands as a Task with status=inbox, created_by=client, normal per-project numbering. Clients see only tickets they created (in linked projects) — never assessment or other team-only fields. Clients get 403 on all team endpoints; team users get 403 on /client/*. A client keeps ≥1 project link (enforced on create/patch).

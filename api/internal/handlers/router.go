@@ -24,7 +24,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	authG.Post("/logout", Logout)
 	authG.Get("/me", middleware.RequireAuth(jwtSecret, gdb), Me)
 
-	// user management — global admin only
+	// user management — global admin only (implies non-client)
 	users := api.Group("/users", middleware.RequireAdmin(jwtSecret, gdb))
 	users.Get("/", ListUsers(gdb))
 	users.Post("/", CreateUser(gdb))
@@ -32,8 +32,9 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	// parametric — after the static /api/users routes above
 	users.Patch("/:id", PatchUser(gdb))
 
-	// teams — reads for any authed user (members see own), writes global admin
-	teams := api.Group("/teams", middleware.RequireAuth(jwtSecret, gdb))
+	// teams — reads for any team user (members see own), writes global admin.
+	// RequireTeam: clients get 403 on every team surface.
+	teams := api.Group("/teams", middleware.RequireTeam(jwtSecret, gdb))
 	teams.Get("/", ListTeams(gdb))
 	teams.Get("/:id/members", ListTeamMembers(gdb))
 	teamsAdmin := api.Group("/teams", middleware.RequireAdmin(jwtSecret, gdb))
@@ -45,7 +46,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 
 	// projects — visibility scoping (admin or member, else 404 no-leak) lives
 	// in the handlers
-	projects := api.Group("/projects", middleware.RequireAuth(jwtSecret, gdb))
+	projects := api.Group("/projects", middleware.RequireTeam(jwtSecret, gdb))
 	projects.Get("/", ListProjects(gdb))
 	projects.Post("/", CreateProject(gdb))
 	// parametric — after the static /api/projects routes above
@@ -61,7 +62,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 
 	// tasks — GET / and /events must be registered BEFORE the parametric
 	// /:id route (static-before-parametric, same as /api/users above)
-	tasks := api.Group("/tasks", middleware.RequireAuth(jwtSecret, gdb))
+	tasks := api.Group("/tasks", middleware.RequireTeam(jwtSecret, gdb))
 	tasks.Get("/", MyTasks(gdb))
 	tasks.Get("/events", TaskEvents(gdb))
 	tasks.Get("/:id", GetTask(gdb))
@@ -74,6 +75,13 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	tasks.Post("/:id/github/issue", CreateTaskIssue(gdb, ghEncKey))
 
 	// labels — DELETE only (creation is per-project above)
-	labels := api.Group("/labels", middleware.RequireAuth(jwtSecret, gdb))
+	labels := api.Group("/labels", middleware.RequireTeam(jwtSecret, gdb))
 	labels.Delete("/:id", DeleteLabel(gdb))
+
+	// client portal — clients only (team users get 403). Static group before
+	// nothing parametric; registered last per the static-first convention.
+	client := api.Group("/client", middleware.RequireClient(jwtSecret, gdb))
+	client.Get("/projects", ClientListProjects(gdb))
+	client.Post("/tickets", ClientCreateTicket(gdb))
+	client.Get("/tickets", ClientListTickets(gdb))
 }

@@ -63,12 +63,48 @@ func RequireAdmin(jwtSecret string, gdb *gorm.DB) fiber.Handler {
 			return nil
 		}
 		if user.GlobalRole != "admin" {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": fiber.Map{"code": "forbidden", "message": "global admin role required"},
-			})
+			return forbidden(c, "global admin role required")
 		}
 		return c.Next()
 	}
+}
+
+// RequireTeam: auth, then 403 for clients — every team surface (users/teams/
+// projects/tasks/labels) is off-limits to the client role; they live on
+// /api/client/* only. Same loadUser-not-RequireAuth rule as RequireAdmin.
+func RequireTeam(jwtSecret string, gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user := loadUser(c, jwtSecret, gdb)
+		if user == nil {
+			return nil
+		}
+		if user.GlobalRole == "client" {
+			return forbidden(c, "team access required")
+		}
+		c.Locals(UserKey, user)
+		return c.Next()
+	}
+}
+
+// RequireClient: auth, then 403 unless global_role=client — the portal routes.
+func RequireClient(jwtSecret string, gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		user := loadUser(c, jwtSecret, gdb)
+		if user == nil {
+			return nil
+		}
+		if user.GlobalRole != "client" {
+			return forbidden(c, "client role required")
+		}
+		c.Locals(UserKey, user)
+		return c.Next()
+	}
+}
+
+func forbidden(c *fiber.Ctx, message string) error {
+	return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+		"error": fiber.Map{"code": "forbidden", "message": message},
+	})
 }
 
 func unauthorized(c *fiber.Ctx, code string) {

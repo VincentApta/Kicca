@@ -16,12 +16,14 @@ import (
 )
 
 // userJSON is the wire `user` shape: {id, email, name, global_role}. The
-// password hash is never serialized.
+// password hash is never serialized. ProjectIDs carries a client's project
+// links on the admin user-management responses only (omitempty elsewhere).
 type userJSON struct {
-	ID         string `json:"id"`
-	Email      string `json:"email"`
-	Name       string `json:"name"`
-	GlobalRole string `json:"global_role"`
+	ID         string   `json:"id"`
+	Email      string   `json:"email"`
+	Name       string   `json:"name"`
+	GlobalRole string   `json:"global_role"`
+	ProjectIDs []string `json:"project_ids,omitempty"`
 }
 
 func toUserJSON(u *models.User) userJSON {

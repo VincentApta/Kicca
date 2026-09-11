@@ -6,7 +6,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 
 ## Conventions
 - ids: uuid v4 strings.
-- enums lowercase snake_case: status `inbox|backlog|in_progress|review|done|blocked|trash`; priority `urgent|high|medium|low`; roles `admin|member` (global), `project_admin|member` (project).
+- enums lowercase snake_case: status `inbox|backlog|in_progress|review|done|blocked|trash`; priority `urgent|high|medium|low`; roles `admin|member|client` (global), `project_admin|member` (project).
 - datetimes ISO-8601 UTC. Dates `YYYY-MM-DD`.
 - pagination (list endpoints): `?page=1&per_page=50` → `{ data: [...], page, per_page, total }`.
 
@@ -25,8 +25,10 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | /users | ?page | list |
-| POST | /users | `{email, name, password, global_role}` | 201 user; 409 email exists |
-| PATCH | /users/:id | `{name?, global_role?, password?, disabled?}` | |
+| POST | /users | `{email, name, password, global_role, project_ids?}` | 201 user; 409 email exists; client role requires ≥1 project_id |
+| PATCH | /users/:id | `{name?, global_role?, password?, disabled?, project_ids?}` | project_ids (client only) replaces links; client→member drops them |
+
+`user` (user-management responses) may add `project_ids: []` for client-role rows.
 
 ### Teams (global admin; members read)
 | Method | Path | Body | Notes |
@@ -73,6 +75,15 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 |---|---|---|
 | POST | /tasks/:id/github/issue | creates GH issue from task; 201 `{repo, issue_number, issue_url}`; 409 already linked; 422 project not configured; 502 upstream error |
 
+### Client portal (client role only — team users get 403)
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| GET | /client/projects | — | linked projects: `{data: [{id, key, name}]}` |
+| POST | /client/tickets | `{project_id, title, description}` | 201 ticket → task status=inbox, created_by=client, per-project numbering; unlinked project 404 (no leak) |
+| GET | /client/tickets | ?page | own tickets (created_by=me, linked projects), newest-updated first |
+
+`client ticket` = `{id, project_id, project_key, number, title, description, status, created_at, updated_at}` — assessment and other team-only fields are never serialized.
+
 ### Misc
 | Method | Path | Notes |
 |---|---|---|
@@ -83,4 +94,5 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 
 ## Auth/permission summary
 - Every `/projects/:id/*` and `/tasks/*` route: membership or global admin check first, then role check.
+- Client role: 403 on every team route (/users, /teams, /projects, /tasks, /labels); team users: 403 on /client/*. /auth/* stays open to all roles.
 - GH token field never serialized in any response.
