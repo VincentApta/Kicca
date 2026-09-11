@@ -24,7 +24,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import { STATUS_LABELS } from '@/lib/labels'
+import { STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
 import type { ClientProjectRef, ClientTicket, Status } from '@/lib/types'
 
@@ -65,6 +65,7 @@ export function ClientPortal() {
   const me = state.phase === 'authenticated' ? state.user : null
 
   const [projects, setProjects] = useState<ClientProjectRef[] | null>(null)
+  const projectLabels = Object.fromEntries((projects ?? []).map((p) => [p.id, `${p.name} · ${p.key}`]))
   const [tickets, setTickets] = useState<ClientTicket[] | null>(null)
   const [detail, setDetail] = useState<ClientTicket | null>(null)
 
@@ -157,7 +158,11 @@ export function ClientPortal() {
                 disabled={(projects?.length ?? 0) === 0}
               >
                 <SelectTrigger className="inset-neu w-full border-0">
-                  <SelectValue placeholder={projects === null ? 'Loading…' : 'Pick a project'} />
+                  <SelectValue placeholder={projects === null ? 'Loading…' : 'Pick a project'}>
+                    {projectId ? (
+                      <SelectLabel value={projectId} labelMap={projectLabels} />
+                    ) : null}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {(projects ?? []).map((p) => (
