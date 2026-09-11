@@ -55,6 +55,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 |---|---|---|---|
 | GET | /projects/:id/tasks | `?status=&assignee_id=&priority=&label=&q=&page=` (default excludes trash) | `{data, page, per_page, total}` |
 | GET | /tasks | `?assignee_id=&page=&per_page=` (assignee optional) | global feed across visible projects; rows add `project_key`, `project_name` |
+| GET | /tasks/events | `?days=30&project_id=` (days capped 90) | `{days, data: [{date, counts: {status: n}}]}` end-of-day status counts (#26) |
 | POST | /projects/:id/tasks | `{title, description?, status?, priority?, type?, estimate?, assignee_id?, due_date?, label_ids?[]}` | 201 task; defaults status=backlog priority=medium type=task |
 | GET | /tasks/:id | — | task + labels + gh_link + comments separate |
 | PATCH | /tasks/:id | any task field incl. `status`, `position`, `type`, `estimate` (null clears) | member+ |

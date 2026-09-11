@@ -92,10 +92,15 @@ type TaskEvent struct {
 // GORM's default would not match migrations/000005_task_analytics.up.sql).
 func (TaskEvent) TableName() string { return "task_events" }
 
-// BeforeCreate fills a uuid v4 primary key (app-side, both dialects).
+// BeforeCreate fills a uuid v4 primary key (app-side, both dialects) and
+// stamps At — GORM writes the column explicitly, so the SQL DEFAULT now()
+// would never fire (and sqlite in tests has none).
 func (e *TaskEvent) BeforeCreate(_ *gorm.DB) error {
 	if e.ID == "" {
 		e.ID = uuid.NewString()
+	}
+	if e.At.IsZero() {
+		e.At = time.Now().UTC()
 	}
 	return nil
 }

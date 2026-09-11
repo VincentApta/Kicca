@@ -59,9 +59,11 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	projects.Post("/:id/labels", CreateLabel(gdb))
 	projects.Put("/:id/github", PutProjectGithub(gdb, ghEncKey))
 
-	// tasks — GET / must be registered BEFORE the parametric /:id route
+	// tasks — GET / and /events must be registered BEFORE the parametric
+	// /:id route (static-before-parametric, same as /api/users above)
 	tasks := api.Group("/tasks", middleware.RequireAuth(jwtSecret, gdb))
 	tasks.Get("/", MyTasks(gdb))
+	tasks.Get("/events", TaskEvents(gdb))
 	tasks.Get("/:id", GetTask(gdb))
 	tasks.Patch("/:id", PatchTask(gdb))
 	tasks.Delete("/:id", DeleteTask(gdb))

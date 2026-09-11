@@ -10,6 +10,7 @@ export type Status =
   | 'trash'
 
 export type Priority = 'urgent' | 'high' | 'medium' | 'low'
+export type TaskType = 'task' | 'bug' | 'feature' | 'chore'
 export type GlobalRole = 'admin' | 'member'
 export type ProjectRole = 'project_admin' | 'member'
 
@@ -73,10 +74,14 @@ export type Task = {
   description: string
   status: Status
   priority: Priority
+  type: TaskType
+  estimate: number | null // story points, >= 0
   assignee: User | null
   labels: Label[]
   due_date: string | null // YYYY-MM-DD
   position: number
+  started_at: string | null // analytics: first in_progress/review touch
+  done_at: string | null // analytics: entry into done
   created_by: string
   created_at: string
   updated_at: string
@@ -116,6 +121,8 @@ export type TaskCreate = {
   description?: string
   status?: Status
   priority?: Priority
+  type?: TaskType
+  estimate?: number | null
   assignee_id?: string | null
   due_date?: string | null
   label_ids?: string[]
@@ -126,7 +133,15 @@ export type TaskPatch = Partial<{
   description: string
   status: Status
   priority: Priority
+  type: TaskType
+  estimate: number | null
   assignee_id: string | null
   due_date: string | null
   label_ids: string[]
 }>
+
+/** GET /api/tasks/events — per-day end-of-day status counts. */
+export type TaskEventsDay = {
+  date: string // YYYY-MM-DD
+  counts: Record<string, number>
+}

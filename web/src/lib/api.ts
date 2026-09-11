@@ -15,6 +15,7 @@ import type {
   Status,
   Task,
   TaskCreate,
+  TaskEventsDay,
   TaskPatch,
   Team,
   User,
@@ -110,6 +111,13 @@ export const api = {
   myFetchMyTasks: (assigneeId?: string, page = 1, perPage = 100) =>
     req<Paginated<Task>>(
       `/tasks?page=${page}&per_page=${perPage}${assigneeId ? `&assignee_id=${assigneeId}` : ''}`,
+    ),
+
+  // Analytics: per-day status counts over the last `days` days (capped 90),
+  // visibility-scoped server-side; optional project filter.
+  fetchTaskEvents: (days = 30, projectId?: string) =>
+    req<{ days: number; data: TaskEventsDay[] }>(
+      `/tasks/events?days=${days}${projectId ? `&project_id=${projectId}` : ''}`,
     ),
 
   // Tasks
