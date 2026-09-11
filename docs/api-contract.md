@@ -71,7 +71,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 
 `task` = `{id, project_id, number, title, description, status, priority, type, estimate, assignee?: user|null, labels: [{id,name,color}], due_date, position, started_at, done_at, created_by, created_at, updated_at, gh_link?: {repo, issue_number, issue_url}|null}`.
 
-`attachment` (team) = `{id, task_id, filename, content_type, size_bytes, created_by, created_at}`. Storage backend (S3 when S3_BUCKET set, else ATTACHMENTS_DIR local) never surfaces; object_key stays server-side. Issue creation from a task uploads each attachment to github.com/user-attachments and embeds the permanent URL (images `![](url)`, videos bare URL) in the issue body.
+`attachment` (team) = `{id, task_id, filename, content_type, size_bytes, created_by, created_at}`. Storage backend (S3 when S3_BUCKET set, else ATTACHMENTS_DIR local) never surfaces; object_key stays server-side. Issue creation from a task embeds S3 attachments as presigned URLs (images `![](url)`, videos bare URL; 24h). Local-storage attachments are skipped with a log line — GitHub has no public upload API.
 
 Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `started_at`/`done_at` = server-stamped analytics timestamps (rule 8, not client-settable).
 
