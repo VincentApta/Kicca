@@ -101,17 +101,6 @@ export function Sidebar({
         </button>
       )}
 
-      {/* board nav — only when a project is open */}
-      {currentProjectId && (
-        <NavButton
-          label="Board"
-          icon={<SquareKanbanIcon className="size-4 shrink-0" strokeWidth={1.5} />}
-          active={view === 'board' || view === 'list' || view === 'trash'}
-          collapsed={collapsed}
-          onClick={() => onNavigate('board')}
-        />
-      )}
-
       <nav className="flex flex-1 flex-col gap-3" aria-label="Main">
         <NavButton
           label="Dashboard"
@@ -143,15 +132,34 @@ export function Sidebar({
         />
       </nav>
 
-      {/* project context — settings for global admins and project admins */}
-      {settingsAvailable && (
-        <NavButton
-          label="Project settings"
-          icon={<SettingsIcon className="size-4 shrink-0" strokeWidth={1.5} />}
-          active={view === 'settings'}
-          collapsed={collapsed}
-          onClick={() => onNavigate('settings')}
-        />
+      {/* project context — appears when a project is open; Board + settings
+          grouped so no implicit "workspace" lingers in the main nav */}
+      {(currentProjectId || settingsAvailable) && (
+        <div className="flex flex-col gap-3">
+          {!collapsed && (
+            <p className="px-3 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Project
+            </p>
+          )}
+          {currentProjectId && (
+            <NavButton
+              label="Board"
+              icon={<SquareKanbanIcon className="size-4 shrink-0" strokeWidth={1.5} />}
+              active={view === 'board' || view === 'list' || view === 'trash'}
+              collapsed={collapsed}
+              onClick={() => onNavigate('board')}
+            />
+          )}
+          {settingsAvailable && (
+            <NavButton
+              label="Project settings"
+              icon={<SettingsIcon className="size-4 shrink-0" strokeWidth={1.5} />}
+              active={view === 'settings'}
+              collapsed={collapsed}
+              onClick={() => onNavigate('settings')}
+            />
+          )}
+        </div>
       )}
 
       {isAdmin && (
