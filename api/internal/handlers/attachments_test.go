@@ -228,9 +228,10 @@ func TestClientTicketAttachmentsIsolation(t *testing.T) {
 	}
 }
 
-// TestGithubIssueEmbedsAttachments: attachment URLs are computed before the
-// create call and land in the issue body; images as ![alt](url).
-func TestGithubIssueEmbedsAttachments(t *testing.T) {
+// TestGithubIssueSkipsLocalAttachments: local storage has no presign, so
+// attachments never land in the issue body (GitHub can't fetch them);
+// the issue itself is still created.
+func TestGithubIssueSkipsLocalAttachments(t *testing.T) {
 	t.Setenv("ATTACHMENTS_DIR", t.TempDir())
 	app, _, mock, admin, projectID, taskID := ghFixture(t, http.StatusCreated)
 	uploadPng(t, app, "/api/tasks/"+taskID+"/attachments", admin, "shot.png")
@@ -240,36 +241,16 @@ func TestGithubIssueEmbedsAttachments(t *testing.T) {
 	if status != http.StatusCreated {
 		t.Fatalf("create issue: got %d %v", status, body)
 	}
-	// upload happened first, then the issue create
-	if mock.count() != 2 {
-		t.Fatalf("upstream calls: %d, want 2", mock.count())
+	// only the issue create is upstream — no attachment upload call (#34
+	// removed: GitHub has no public upload API)
+	if mock.count() != 1 {
+		t.Fatalf("upstream calls: %d, want 1", mock.count())
 	}
 	_, path, upBody := mock.last(t)
 	if path != "/repos/acme/app/issues" {
 		t.Fatalf("last call path: %q", path)
 	}
-	want := "![shot.png](https://github.com/user-attachments/assets/att123)"
-	if !strings.Contains(upBody, want) {
-		t.Fatalf("issue body missing %q: %s", want, upBody)
-	}
-}
-
-// TestGithubIssueAttachmentUploadFailureSkips: local storage + failing
-// user-attachments upload → the attachment is skipped (logged) and the issue
-// is still created.
-func TestGithubIssueAttachmentUploadFailureSkips(t *testing.T) {
-	t.Setenv("ATTACHMENTS_DIR", t.TempDir())
-	// statuses in order: attachment upload → 500, issue create → 201
-	app, _, mock, admin, projectID, taskID := ghFixture(t, http.StatusInternalServerError, http.StatusCreated)
-	uploadPng(t, app, "/api/tasks/"+taskID+"/attachments", admin, "shot.png")
-	configureGithub(t, app, admin, projectID)
-
-	status, body, _ := do(t, app, http.MethodPost, "/api/tasks/"+taskID+"/github/issue", "", admin)
-	if status != http.StatusCreated {
-		t.Fatalf("issue create despite upload failure: got %d %v, want 201", status, body)
-	}
-	_, _, upBody := mock.last(t)
-	if strings.Contains(upBody, "user-attachments") {
-		t.Fatalf("failed upload must not land in body: %s", upBody)
+	if strings.Contains(upBody, "user-attachments") || strings.Contains(upBody, "shot.png") {
+		t.Fatalf("local attachment must not land in issue body: %s", upBody)
 	}
 }

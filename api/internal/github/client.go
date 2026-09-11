@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -36,59 +34,6 @@ func NewClient() *Client {
 		base: strings.TrimSuffix(base, "/"),
 		http: &http.Client{Timeout: 10 * time.Second},
 	}
-}
-
-// UploadAttachment POSTs the file as multipart/form-data to
-// /user/attachments?name=<filename> on the api base (api.github.com) and
-// returns the permanent browser_download_url (renders inline in issue
-// bodies). GitHub requires multipart + the name query param (raw body gets
-// 400 "Multipart form data required"; uploads.github.com always 422s) and
-// answers 202 Accepted. No retry: the caller skips the attachment on
-// failure rather than failing the issue.
-func (c *Client) UploadAttachment(token, filename, contentType string, body io.Reader) (string, error) {
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	fw, err := mw.CreateFormFile("file", filename)
-	if err != nil {
-		return "", fmt.Errorf("build multipart: %w", err)
-	}
-	if _, err := io.Copy(fw, body); err != nil {
-		return "", fmt.Errorf("copy attachment: %w", err)
-	}
-	if err := mw.Close(); err != nil {
-		return "", fmt.Errorf("close multipart: %w", err)
-	}
-
-	name := url.QueryEscape(filename)
-	// GitHub ignores the multipart part's Content-Type and sniffs bytes
-	// server-side; CreateFormFile sends application/octet-stream, which the
-	// endpoint accepts.
-	req, err := http.NewRequest(http.MethodPost, c.base+"/user/attachments?name="+name, &buf)
-	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("github uploads unreachable: %v", err)
-	}
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if err != nil {
-		return "", fmt.Errorf("read github response: %v", err)
-	}
-	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("github uploads returned %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
-	}
-	var out struct {
-		URL string `json:"browser_download_url"`
-	}
-	if err := json.Unmarshal(raw, &out); err != nil || out.URL == "" {
-		return "", fmt.Errorf("unexpected github uploads response shape")
-	}
-	return out.URL, nil
 }
 
 // CreateIssue POSTs /repos/{owner}/{name}/issues — title + markdown body,

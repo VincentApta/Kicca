@@ -142,31 +142,30 @@ type presigner interface {
 	PresignURL(ctx context.Context, key string, ttl time.Duration) (string, error)
 }
 
-// attachmentsMarkdown renders the task's attachments for the issue body:
-// each is uploaded to github.com/user/attachments (permanent URL, inline
-// rendering). Images become ![filename](url); videos a bare URL on its own
-// line (GitHub renders a player). Failures never block the issue: S3 falls
-// back to a presigned URL, local storage skips the file with a log line.
+// attachmentsMarkdown renders the task's attachments for the issue body.
+// GitHub has no public API for uploading issue attachments — the web-upload
+// endpoint is browser-only (CSRF session, not PAT) — so embedding only
+// works for objects GitHub can fetch: S3 presigned URLs (24h). Images
+// become ![filename](url); videos a bare URL on its own line (GitHub
+// renders a player). Local-storage files are skipped with a log line; the
+// issue is still created.
 func attachmentsMarkdown(gdb *gorm.DB, token, taskID string) string {
 	var atts []models.TaskAttachment
 	if err := gdb.Where("task_id = ?", taskID).Order("created_at").Find(&atts).Error; err != nil || len(atts) == 0 {
 		return ""
 	}
 	ctx := context.Background()
-	client := github.NewClient()
 	lines := make([]string, 0, len(atts))
 	for i := range atts {
 		a := &atts[i]
-		url := uploadAttachmentURL(ctx, client, token, a)
-		if url == "" {
-			if ps, ok := attStore.(presigner); ok {
-				if u, err := ps.PresignURL(ctx, a.ObjectKey, 24*time.Hour); err == nil {
-					url = u
-				}
+		var url string
+		if ps, ok := attStore.(presigner); ok {
+			if u, err := ps.PresignURL(ctx, a.ObjectKey, 24*time.Hour); err == nil {
+				url = u
 			}
 		}
 		if url == "" {
-			log.Printf("github issue: attachment %s skipped (upload failed, no presign)", a.ID)
+			log.Printf("github issue: attachment %s skipped (no presign: local storage)", a.ID)
 			continue
 		}
 		if strings.HasPrefix(a.ContentType, "image/") {
@@ -176,20 +175,4 @@ func attachmentsMarkdown(gdb *gorm.DB, token, taskID string) string {
 		}
 	}
 	return strings.Join(lines, "\n\n")
-}
-
-// uploadAttachmentURL streams the blob from the store straight into the
-// user-attachments endpoint. "" means failure (caller decides the fallback).
-func uploadAttachmentURL(ctx context.Context, client *github.Client, token string, a *models.TaskAttachment) string {
-	rc, err := attStore.Open(ctx, a.ObjectKey)
-	if err != nil {
-		return ""
-	}
-	defer rc.Close()
-	url, err := client.UploadAttachment(token, a.Filename, a.ContentType, rc)
-	if err != nil {
-		log.Printf("github issue: attachment %s upload: %v", a.ID, err)
-		return ""
-	}
-	return url
 }
