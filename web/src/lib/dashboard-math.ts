@@ -8,6 +8,9 @@ export type Bucket = { label: string; count: number }
 
 const DAY_MS = 86_400_000
 
+export const OPEN_STATUSES = ['inbox', 'backlog', 'in_progress', 'review', 'blocked'] as const
+export type OpenStatus = (typeof OPEN_STATUSES)[number]
+
 export function dayKey(d: Date | string): string {
   return typeof d === 'string' ? d.slice(0, 10) : d.toISOString().slice(0, 10)
 }
@@ -131,4 +134,76 @@ export function cfd(
     out.push({ date: day, created, done })
   }
   return out
+}
+
+export type ProjectHealth = 'ongoing' | 'stalled' | 'done'
+export type ProjectStat = {
+  projectId: string
+  total: number
+  open: number
+  backlog: number
+  done: number
+  overdue: number
+  lastActivity: string | null // max(updated_at) over open tasks
+  mainStatus: OpenStatus | 'done' | null // most common status among non-done
+  health: ProjectHealth
+  progress: number // done/total, 0..1
+}
+
+/** Per-project rollup. stalled = open work with no update in 14d. Sorted:
+ * backlog (most first) -> overdue -> ongoing/done. */
+export function projectStats(
+  tasks: {
+    project_id: string
+    status: string
+    updated_at: string
+    due_date?: string | null
+  }[],
+  now: Date,
+): ProjectStat[] {
+  const byProject = new Map<string, ProjectStat>()
+  const today = dayKey(now)
+  for (const t of tasks) {
+    let s = byProject.get(t.project_id)
+    if (!s) {
+      s = {
+        projectId: t.project_id, total: 0, open: 0, backlog: 0, done: 0,
+        overdue: 0, lastActivity: null, mainStatus: null, health: 'ongoing', progress: 0,
+      }
+      byProject.set(t.project_id, s)
+    }
+    s.total++
+    if (t.status === 'done') {
+      s.done++
+    } else if ((OPEN_STATUSES as readonly string[]).includes(t.status)) {
+      s.open++
+      if (t.status === 'backlog') s.backlog++
+      if (t.due_date && t.due_date < today) s.overdue++
+      if (!s.lastActivity || t.updated_at > s.lastActivity) s.lastActivity = t.updated_at
+    }
+  }
+  const statusCount = new Map<string, Map<string, number>>()
+  for (const t of tasks) {
+    if (t.status === 'done') continue
+    if (!(OPEN_STATUSES as readonly string[]).includes(t.status)) continue // trash
+    let m = statusCount.get(t.project_id)
+    if (!m) { m = new Map(); statusCount.set(t.project_id, m) }
+    m.set(t.status, (m.get(t.status) ?? 0) + 1)
+  }
+
+  const out = [...byProject.values()]
+  for (const s of out) {
+    const m = statusCount.get(s.projectId)
+    if (m && m.size > 0) {
+      s.mainStatus = [...m.entries()].sort((a, b) => b[1] - a[1])[0][0] as OpenStatus
+    }
+    s.progress = s.total > 0 ? s.done / s.total : 0
+    const staleDays = s.lastActivity
+      ? (now.getTime() - new Date(s.lastActivity).getTime()) / DAY_MS
+      : Infinity
+    s.health = s.open === 0 ? 'done' : staleDays > 14 ? 'stalled' : 'ongoing'
+  }
+  return out.sort((a, b) =>
+    b.backlog - a.backlog || b.overdue - a.overdue || a.health.localeCompare(b.health),
+  )
 }

@@ -7,6 +7,7 @@ import {
   cfd,
   cycleHistogram,
   dayKey,
+  projectStats,
   throughput,
 } from './dashboard-math'
 
@@ -129,5 +130,45 @@ describe('cfd', () => {
     expect(s[3]).toEqual({ date: dayKey(d(-3)), created: 2, done: 1 })
     // today: all three created, two done
     expect(s[6]).toEqual({ date: dayKey(d(0)), created: 3, done: 2 })
+  })
+})
+
+describe('projectStats', () => {
+  it('rolls up per project: counts, main status, health, progress', () => {
+    const tasks = [
+      // p1: heavy backlog, fresh activity
+      { project_id: 'p1', status: 'backlog', updated_at: d(-1), due_date: null },
+      { project_id: 'p1', status: 'backlog', updated_at: d(-2), due_date: null },
+      { project_id: 'p1', status: 'in_progress', updated_at: d(-1), due_date: '2026-01-01' },
+      { project_id: 'p1', status: 'done', updated_at: d(-3), due_date: null },
+      // p2: all done
+      { project_id: 'p2', status: 'done', updated_at: d(-1), due_date: null },
+      // p3: open but untouched 20d
+      { project_id: 'p3', status: 'in_progress', updated_at: d(-20), due_date: null },
+      // p4: trash only — open=0 counts as done-health but no open tasks
+      { project_id: 'p4', status: 'trash', updated_at: d(-1), due_date: null },
+    ]
+    const stats = projectStats(tasks, NOW)
+    const p1 = stats.find((s) => s.projectId === 'p1')!
+    expect(p1.total).toBe(4)
+    expect(p1.open).toBe(3)
+    expect(p1.backlog).toBe(2)
+    expect(p1.done).toBe(1)
+    expect(p1.overdue).toBe(1)
+    expect(p1.mainStatus).toBe('backlog')
+    expect(p1.health).toBe('ongoing')
+    expect(p1.progress).toBeCloseTo(0.25)
+    expect(p1.lastActivity).toBe(d(-1))
+
+    const p2 = stats.find((s) => s.projectId === 'p2')!
+    expect(p2.health).toBe('done')
+    expect(p2.mainStatus).toBeNull()
+
+    const p3 = stats.find((s) => s.projectId === 'p3')!
+    expect(p3.health).toBe('stalled')
+
+    // sort: p1 (2 backlog) first, then p3 (1 open, stalled), p4/p2 by health
+    expect(stats[0].projectId).toBe('p1')
+    expect(stats.map((s) => s.projectId)).toContain('p3')
   })
 })

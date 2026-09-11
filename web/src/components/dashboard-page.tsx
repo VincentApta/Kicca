@@ -10,10 +10,9 @@ import { useAuth } from '@/lib/auth'
 import type { Project, Task, User } from '@/lib/types'
 import { STATUS_LABELS, TYPE_LABELS } from '@/lib/labels'
 import {
-  agingWip, avgCycleTime, burndown, cfd, cycleHistogram, throughput,
+  OPEN_STATUSES, agingWip, avgCycleTime, burndown, cfd, cycleHistogram,
+  projectStats, throughput,
 } from '@/lib/dashboard-math'
-
-const OPEN_STATUSES = ['inbox', 'backlog', 'in_progress', 'review', 'blocked'] as const
 
 const STATUS_DOT: Record<string, string> = {
   inbox: 'bg-status-inbox', backlog: 'bg-status-backlog',
@@ -169,6 +168,17 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
     .filter((b) => b.tasks.length > 0)
   const maxCount = Math.max(1, ...byStatus.map((b) => b.tasks.length))
 
+  // project-wise rollup over ALL tasks (member filter applies, project filter
+  // would make it a single row, so show it whenever tasks exist)
+  const projStats = projectStats(allTasks, now)
+  const projById = new Map(projects.map((p) => [p.id, p]))
+  const HEALTH_BADGE: Record<string, string> = {
+    ongoing: 'text-status-in-progress', stalled: 'text-status-blocked', done: 'text-status-done',
+  }
+  const HEALTH_LABEL: Record<string, string> = {
+    ongoing: 'Ongoing', stalled: 'Stalled', done: 'Done',
+  }
+
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6">
       <div className="flex flex-wrap items-center gap-3">
@@ -208,7 +218,59 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
         <StatCard icon={<AlertTriangleIcon className="size-5 text-status-blocked" strokeWidth={1.5} />} label="Overdue" value={String(overdue.length)} />
       </div>
 
-      {/* row 2 — burndown + throughput */}
+      {/* row 2 — project-wise overview */}
+      <section className="card-neu" aria-label="Projects overview">
+        <h2 className="mb-4 text-sm font-medium text-foreground">Projects</h2>
+        {projStats.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No projects with tasks yet.</p>
+        ) : (
+          <ul className="space-y-4">
+            {projStats.map((s) => {
+              const p = projById.get(s.projectId)
+              return (
+                <li key={s.projectId}>
+                  <button
+                    onClick={() => setProjectId(s.projectId)}
+                    className="inset-neu flex w-full flex-col gap-2 px-4 py-3 text-left transition-shadow hover:shadow-[var(--shadow-inset),var(--shadow-glow)]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
+                        {p?.key ?? '?'}
+                      </span>
+                      <span className="flex-1 truncate text-sm font-medium text-foreground">
+                        {p?.name ?? 'Unknown project'}
+                      </span>
+                      <span className={`shrink-0 text-[10px] font-medium tracking-wide uppercase ${HEALTH_BADGE[s.health]}`}>
+                        {HEALTH_LABEL[s.health]}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                      {s.mainStatus ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className={`size-2 rounded-full ${STATUS_DOT[s.mainStatus]}`} />
+                          {STATUS_LABELS[s.mainStatus]}
+                        </span>
+                      ) : (
+                        <span>—</span>
+                      )}
+                      <span className="font-mono">{s.open} open</span>
+                      <span className="font-mono">{s.backlog} backlog</span>
+                      {s.overdue > 0 && <span className="font-mono text-status-blocked">{s.overdue} overdue</span>}
+                      <span className="ml-auto font-mono">{s.done}/{s.total}</span>
+                    </div>
+                    <div className="inset-neu h-2 rounded-md p-0.5">
+                      <div className="h-full rounded-sm bg-status-done opacity-80"
+                        style={{ width: `${s.progress * 100}%` }} />
+                    </div>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* row 3 — burndown + throughput */}
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card-neu" aria-label="Burndown">
           <h2 className="mb-4 text-sm font-medium text-foreground">
@@ -222,17 +284,19 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
         </section>
       </div>
 
-      {/* row 3 — CFD */}
-      <section className="card-neu" aria-label="Cumulative flow diagram">
-        <h2 className="mb-4 text-sm font-medium text-foreground">
-          Cumulative flow — 30d
-          <span className="ml-3 inline-flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-in-progress" />created</span>
-            <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-done" />done</span>
-          </span>
-        </h2>
-        <CfdChart data={cfdSeries} />
-      </section>
+      {/* row 4 — CFD (half width) */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="card-neu" aria-label="Cumulative flow diagram">
+          <h2 className="mb-4 text-sm font-medium text-foreground">
+            Cumulative flow — 30d
+            <span className="ml-3 inline-flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-in-progress" />created</span>
+              <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-done" />done</span>
+            </span>
+          </h2>
+          <CfdChart data={cfdSeries} />
+        </section>
+      </div>
 
       {/* row 3 — cycle histogram + aging wip */}
       <div className="grid gap-6 lg:grid-cols-2">
