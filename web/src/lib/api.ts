@@ -2,6 +2,8 @@
 // Cookie session: same-origin fetch sends kicca_session automatically.
 
 import type {
+  ClientProjectRef,
+  ClientTicket,
   Comment,
   GhLink,
   Label,
@@ -166,4 +168,12 @@ export const api = {
   // GitHub
   createGithubIssue: (taskId: string) =>
     req<NonNullable<GhLink>>(`/tasks/${taskId}/github/issue`, { method: 'POST', body: {} }),
+
+  // Client portal (client role only; team users get 403)
+  clientListProjects: () =>
+    req<{ data: ClientProjectRef[] }>('/client/projects'),
+  clientListTickets: (page = 1, perPage = 50) =>
+    req<Paginated<ClientTicket>>(`/client/tickets?page=${page}&per_page=${perPage}`),
+  clientCreateTicket: (body: { project_id: string; title: string; description: string }) =>
+    req<ClientTicket>('/client/tickets', { method: 'POST', body }),
 }

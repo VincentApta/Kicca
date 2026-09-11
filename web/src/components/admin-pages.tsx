@@ -149,7 +149,7 @@ async function loadAllUsers(): Promise<User[]> {
 }
 
 // Trigger display maps — Select.Value would render the raw stored value.
-const GLOBAL_ROLE_LABELS: Record<string, string> = { member: 'Member', admin: 'Admin' }
+const GLOBAL_ROLE_LABELS: Record<string, string> = { member: 'Member', admin: 'Admin', client: 'Client' }
 const ACCOUNT_STATUS_LABELS: Record<string, string> = { active: 'Active', disabled: 'Disabled' }
 const PROJECT_ROLE_LABELS: Record<string, string> = { project_admin: 'Project admin', member: 'Member' }
 
@@ -215,7 +215,7 @@ export function UsersPage() {
                     <TableCell className="font-medium">{u.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
                     <TableCell className="text-xs">
-                      {u.global_role === 'admin' ? 'Admin' : 'Member'}
+                      {GLOBAL_ROLE_LABELS[u.global_role] ?? u.global_role}
                     </TableCell>
                     <TableCell className="text-xs">
                       <span className={disabled ? 'text-status-blocked' : 'text-status-done'}>
@@ -286,7 +286,12 @@ export function UsersPage() {
                   ...r,
                   data: r.data.map((u) =>
                     u.id === updated.id
-                      ? { ...u, name: updated.name, global_role: updated.global_role }
+                      ? {
+                          ...u,
+                          name: updated.name,
+                          global_role: updated.global_role,
+                          project_ids: updated.project_ids,
+                        }
                       : u,
                   ),
                 }
@@ -305,6 +310,52 @@ export function UsersPage() {
   )
 }
 
+// Checkbox picker of the client's linked projects (client role only —
+// projects they may submit tickets into). Native checkboxes, team-members
+// dialog style.
+function ProjectLinksPicker({
+  projects,
+  selected,
+  error,
+  onToggle,
+}: {
+  projects: Project[] | null
+  selected: ReadonlySet<string>
+  error?: string
+  onToggle: (id: string) => void
+}) {
+  return (
+    <Field label="Linked projects" htmlFor="client-project-links" error={error}>
+      <div
+        id="client-project-links"
+        className="inset-neu flex max-h-48 flex-col gap-0.5 overflow-y-auto p-1.5"
+      >
+        {projects === null && (
+          <p className="p-2 text-sm text-muted-foreground">Loading projects…</p>
+        )}
+        {projects?.length === 0 && (
+          <p className="p-2 text-sm text-muted-foreground">No projects exist yet.</p>
+        )}
+        {projects?.map((p) => (
+          <label
+            key={p.id}
+            className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-accent"
+          >
+            <input
+              type="checkbox"
+              className="size-4 accent-[var(--primary)]"
+              checked={selected.has(p.id)}
+              onChange={() => onToggle(p.id)}
+            />
+            <span className="flex-1 truncate text-sm text-foreground">{p.name}</span>
+            <span className="font-mono text-xs text-muted-foreground">{p.key}</span>
+          </label>
+        ))}
+      </div>
+    </Field>
+  )
+}
+
 function CreateUserDialog({
   open,
   onClose,
@@ -319,6 +370,8 @@ function CreateUserDialog({
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<GlobalRole>('member')
+  const [projects, setProjects] = useState<Project[] | null>(null)
+  const [linked, setLinked] = useState<ReadonlySet<string>>(new Set())
   const [errors, setErrors] = useState<FieldErrors>({})
   const [busy, setBusy] = useState(false)
 
@@ -328,18 +381,29 @@ function CreateUserDialog({
       setName('')
       setPassword('')
       setRole('member')
+      setLinked(new Set())
       setErrors({})
+      setProjects(null)
+      // lazy: only fetched when a client might be created
+      api.listProjects().then(({ data }) => setProjects(data), () => setProjects([]))
     }
   }, [open])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     const v = validateUserCreate({ email, name, password })
+    if (role === 'client' && linked.size === 0) v.projects = 'A client must be linked to at least one project.'
     setErrors(v)
     if (Object.keys(v).length > 0) return
     setBusy(true)
     try {
-      await api.createUser({ email: email.trim(), name: name.trim(), password, global_role: role })
+      await api.createUser({
+        email: email.trim(),
+        name: name.trim(),
+        password,
+        global_role: role,
+        ...(role === 'client' ? { project_ids: [...linked] } : {}),
+      })
       toast('User created')
       onCreated()
     } catch (err) {
@@ -401,9 +465,25 @@ function CreateUserDialog({
               <SelectContent>
                 <SelectItem value="member">Member</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="client">Client</SelectItem>
               </SelectContent>
             </Select>
           </Field>
+          {role === 'client' && (
+            <ProjectLinksPicker
+              projects={projects}
+              selected={linked}
+              error={errors.projects}
+              onToggle={(id) =>
+                setLinked((s) => {
+                  const next = new Set(s)
+                  if (next.has(id)) next.delete(id)
+                  else next.add(id)
+                  return next
+                })
+              }
+            />
+          )}
           {errors.form && (
             <p role="alert" className="text-sm text-destructive">
               {errors.form}
@@ -441,6 +521,8 @@ function EditUserDialog({
   const [role, setRole] = useState<GlobalRole>('member')
   const [status, setStatus] = useState<'active' | 'disabled'>('active')
   const [password, setPassword] = useState('')
+  const [projects, setProjects] = useState<Project[] | null>(null)
+  const [linked, setLinked] = useState<ReadonlySet<string>>(new Set())
   const [errors, setErrors] = useState<FieldErrors>({})
   const [busy, setBusy] = useState(false)
 
@@ -450,7 +532,11 @@ function EditUserDialog({
       setRole(user.global_role)
       setStatus(currentlyDisabled ? 'disabled' : 'active')
       setPassword('')
+      setLinked(new Set(user.project_ids ?? []))
       setErrors({})
+      // cheap unconditional load: role can be switched to client in-form
+      setProjects(null)
+      api.listProjects().then(({ data }) => setProjects(data), () => setProjects([]))
     }
   }, [user, currentlyDisabled])
 
@@ -458,11 +544,13 @@ function EditUserDialog({
     e.preventDefault()
     if (!user) return
     const v = validateUserEdit(name, password)
+    if (role === 'client' && linked.size === 0) v.projects = 'A client must be linked to at least one project.'
     setErrors(v)
     if (Object.keys(v).length > 0) return
     setBusy(true)
     try {
       const patch: UserPatch = { name: name.trim(), global_role: role }
+      if (role === 'client') patch.project_ids = [...linked]
       if (password) patch.password = password
       const nextDisabled = status === 'disabled'
       if (nextDisabled !== currentlyDisabled) patch.disabled = nextDisabled
@@ -504,9 +592,25 @@ function EditUserDialog({
               <SelectContent>
                 <SelectItem value="member">Member</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="client">Client</SelectItem>
               </SelectContent>
             </Select>
           </Field>
+          {role === 'client' && (
+            <ProjectLinksPicker
+              projects={projects}
+              selected={linked}
+              error={errors.projects}
+              onToggle={(id) =>
+                setLinked((s) => {
+                  const next = new Set(s)
+                  if (next.has(id)) next.delete(id)
+                  else next.add(id)
+                  return next
+                })
+              }
+            />
+          )}
           <Field
             label="Status"
             htmlFor="edit-user-status"
