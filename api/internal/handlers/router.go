@@ -34,6 +34,9 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	authG.Post("/logout", Logout)
 	authG.Get("/me", middleware.RequireAuth(jwtSecret, gdb), Me)
 
+	// self-service profile (#49): current user, non-admin only
+	api.Patch("/me", middleware.RequireAuth(jwtSecret, gdb), PatchMe(gdb))
+
 	// user management — global admin only (implies non-client)
 	users := api.Group("/users", middleware.RequireAdmin(jwtSecret, gdb))
 	users.Get("/", ListUsers(gdb))

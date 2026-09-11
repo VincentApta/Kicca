@@ -18,6 +18,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | POST | /auth/login | `{email, password}` | 200 `{user}` + cookie | 401 invalid/disabled |
 | POST | /auth/logout | — | 204 | clears cookie |
 | GET | /auth/me | — | 200 `{user}` | |
+| PATCH | /me | `{name?, current_password?, new_password?}` | 200 user | self-service profile (#49), non-admin only (admin → 403); password change verifies current_password (422 on mismatch); email never changes here |
 
 `user` = `{id, email, name, global_role}`. Admin user-management responses add `disabled: true` for soft-disabled accounts (#45; omitted when active) and `project_ids: []` for client-role rows.
 
@@ -103,4 +104,5 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 ## Auth/permission summary
 - Every `/projects/:id/*` and `/tasks/*` route: membership or global admin check first, then role check.
 - Client role: 403 on every team route (/users, /teams, /projects, /tasks, /labels); team users: 403 on /client/*. /auth/* stays open to all roles.
+- PATCH /api/me (#49): non-admin only — admins keep the Users page.
 - GH token field never serialized in any response.

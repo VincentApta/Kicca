@@ -75,6 +75,8 @@ export const api = {
     req<{ user: User }>('/auth/login', { method: 'POST', body: { email, password } }),
   logout: () => req<void>('/auth/logout', { method: 'POST' }),
   me: (signal?: AbortSignal) => req<{ user: User }>('/auth/me', { signal }),
+  patchMe: (body: { name?: string; current_password?: string; new_password?: string }) =>
+    req<User>('/me', { method: 'PATCH', body }), // self-service profile (#49), non-admin
 
   // Users (global admin)
   listUsers: (page = 1) =>
