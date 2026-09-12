@@ -206,6 +206,19 @@ export function Workspace() {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, gh_link: link } : t)))
   }
 
+  // CSV export of the current filtered view (#50) — mirrors the fetch params
+  function handleExport() {
+    if (!currentProjectId) return
+    api.exportTasks({
+      project_id: currentProjectId,
+      q: filters.q,
+      assignee_id: filters.assignee_id,
+      priority: filters.priority,
+      label: filters.label_id,
+      status: trashMode ? 'trash' : filters.status,
+    })
+  }
+
   function handleRestore(id: string) {
     api.restoreTask(id).then(
       (updated) => {
@@ -258,7 +271,7 @@ export function Workspace() {
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
         currentProjectId={null} onSwitchProject={switchProject}
         onNavigate={setView} onMyTasks={() => setView('mytasks')} myTasksActive={false}
-        settingsAvailable={false}>
+        settingsAvailable={false} onExport={handleExport}>
         {view === 'teams' ? (
           <TeamsPage />
         ) : view === 'users' ? (
@@ -328,6 +341,7 @@ export function Workspace() {
       onMyTasks={() => setView('mytasks')}
       myTasksActive={view === 'mytasks'}
       settingsAvailable={canManageProject}
+      onExport={handleExport}
     >
       {view === 'overview' ? (
         <DashboardPage
@@ -504,6 +518,7 @@ type ShellProps = {
   onMyTasks: () => void
   myTasksActive: boolean
   settingsAvailable: boolean
+  onExport: () => void
 }
 
 function ShellFrame({ children, ...shell }: ShellProps) {
@@ -536,6 +551,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
           me={shell.me}
           onProfile={shell.onProfile}
           onLogout={shell.onLogout}
+          onExport={shell.onExport}
         />
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
       </div>

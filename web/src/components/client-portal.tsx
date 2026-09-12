@@ -3,7 +3,7 @@
 // team nav; assessment and other team-only fields are never rendered (the
 // API doesn't even send them).
 import { useEffect, useState, type FormEvent } from 'react'
-import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SunIcon, TicketIcon } from 'lucide-react'
+import { DownloadIcon, LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,7 @@ import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
 import { STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
-import type { Attachment, ClientProjectRef, ClientTicket, Status, TaskActivityEvent } from '@/lib/types'
+import type { Attachment, ClientComment, ClientProjectRef, ClientTicket, Status, TaskActivityEvent } from '@/lib/types'
 
 // Same palette as my-tasks-page pills.
 const STATUS_COLORS: Record<string, string> = {
@@ -74,6 +74,15 @@ export function ClientPortal() {
   const [detail, setDetail] = useState<ClientTicket | null>(null)
   const [detailAtts, setDetailAtts] = useState<Attachment[] | null>(null)
   const [detailEvents, setDetailEvents] = useState<TaskActivityEvent[] | null>(null)
+  const [detailComments, setDetailComments] = useState<ClientComment[] | null>(null)
+  const [commentBody, setCommentBody] = useState('')
+  const [sending, setSending] = useState(false)
+
+  // my-tickets search + filters (#47) — server-side, same as the team list
+  const [search, setSearch] = useState('')
+  const [ticketsQ, setTicketsQ] = useState('') // debounced search
+  const [filterProject, setFilterProject] = useState('') // '' = all linked
+  const [filterStatus, setFilterStatus] = useState('') // '' | open | closed
 
   // submit form
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -83,12 +92,27 @@ export function ClientPortal() {
   const [errors, setErrors] = useState<{ title?: string; project?: string }>({})
   const [busy, setBusy] = useState(false)
 
-  function refreshTickets() {
-    api.clientListTickets().then(
+  // debounce the search box → ticketsQ
+  useEffect(() => {
+    const t = setTimeout(() => setTicketsQ(search), 250)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // filtered fetch — q, linked project, open/closed
+  function fetchTickets() {
+    api.clientListTickets({
+      q: ticketsQ || undefined,
+      project_id: filterProject || undefined,
+      status: filterStatus === '' ? undefined : (filterStatus as 'open' | 'closed'),
+    }).then(
       ({ data }) => setTickets(data),
       () => setTickets([]),
     )
   }
+
+  useEffect(() => {
+    fetchTickets()
+  }, [ticketsQ, filterProject, filterStatus])
 
   useEffect(() => {
     api.clientListProjects().then(
@@ -98,15 +122,17 @@ export function ClientPortal() {
       },
       () => setProjects([]),
     )
-    refreshTickets()
   }, [])
 
   // ticket detail loads its attachments (client-created ones only — the
-  // server filters to what this client may stream) + activity timeline
+  // server filters to what this client may stream), activity timeline (#44)
+  // and the comment thread (#43: team comments arrive with the author name only)
   useEffect(() => {
     if (!detail) {
       setDetailAtts(null)
       setDetailEvents(null)
+      setDetailComments(null)
+      setCommentBody('')
       return
     }
     api.clientListTicketAttachments(detail.id).then(
@@ -117,7 +143,27 @@ export function ClientPortal() {
       ({ data }) => setDetailEvents(data),
       () => setDetailEvents([]),
     )
+    api.clientListTicketComments(detail.id).then(
+      ({ data }) => setDetailComments(data),
+      () => setDetailComments([]),
+    )
   }, [detail])
+
+  async function submitComment() {
+    if (!detail) return
+    const body = commentBody.trim()
+    if (!body) return
+    setSending(true)
+    try {
+      const c = await api.clientAddTicketComment(detail.id, body)
+      setDetailComments((cs) => [...(cs ?? []), c])
+      setCommentBody('')
+    } catch {
+      toast('Could not post the comment. Try again.', 'error')
+    } finally {
+      setSending(false)
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -146,7 +192,7 @@ export function ClientPortal() {
       setTitle('')
       setDescription('')
       setFiles([])
-      refreshTickets()
+      fetchTickets()
     } catch {
       setErrors({ title: 'Could not submit the ticket. Try again.' })
     } finally {
@@ -166,10 +212,25 @@ export function ClientPortal() {
         </span>
         <div className="ml-auto flex items-center gap-3">
           {me && (
-            <span className="text-sm text-muted-foreground">
+            <span className="hidden text-sm text-muted-foreground md:inline">
               {me.name} <span className="font-mono text-xs">({me.email})</span>
             </span>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              api.clientExportTickets({
+                q: ticketsQ || undefined,
+                project_id: filterProject || undefined,
+                status: filterStatus === '' ? undefined : (filterStatus as 'open' | 'closed'),
+              })
+            }
+            aria-label="Export my tickets as CSV"
+          >
+            <DownloadIcon strokeWidth={1.5} />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -283,6 +344,55 @@ export function ClientPortal() {
         {/* ---- my tickets ---- */}
         <section className="card-neu flex flex-col gap-3 p-5">
           <h2 className="font-heading text-lg font-semibold text-foreground">My tickets</h2>
+          {/* search + filters (#47) — server-side, mirrors the team list */}
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+            <Input
+              className="inset-neu border-0 pl-8"
+              placeholder="Search tickets…"
+              aria-label="Search tickets"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select
+              value={filterProject || null}
+              onValueChange={(v) => setFilterProject(v && v !== 'all' ? v : '')}
+              disabled={(projects?.length ?? 0) === 0}
+            >
+              <SelectTrigger className="inset-neu w-full border-0 text-xs" aria-label="Filter by project">
+                <SelectValue placeholder="All projects">
+                  {filterProject ? <SelectLabel value={filterProject} labelMap={projectLabels} /> : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All projects</SelectItem>
+                {(projects ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} · {p.key}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={filterStatus || null}
+              onValueChange={(v) => setFilterStatus(v === 'all' ? '' : (v ?? ''))}
+            >
+              <SelectTrigger className="inset-neu w-40 border-0 text-xs" aria-label="Filter by status">
+                <SelectValue placeholder="All statuses">
+                  {filterStatus ? (
+                    <span className="capitalize">{filterStatus}</span>
+                  ) : null}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {tickets === null && (
             <div className="flex flex-col gap-2" aria-hidden>
               {[0, 1, 2].map((i) => (
@@ -292,7 +402,9 @@ export function ClientPortal() {
           )}
           {tickets?.length === 0 && (
             <p className="py-4 text-sm text-muted-foreground">
-              Nothing yet — your submitted tickets and their status show up here.
+              {ticketsQ || filterProject || filterStatus
+                ? 'No tickets match — adjust the search or filters.'
+                : 'Nothing yet — your submitted tickets and their status show up here.'}
             </p>
           )}
           <ul className="flex flex-col gap-2">
@@ -376,6 +488,54 @@ export function ClientPortal() {
                 {detailEvents && detailEvents.length > 0 && (
                   <ActivityTimeline events={detailEvents} />
                 )}
+              </div>
+              {/* ---- comments thread (#43): read team questions, reply ---- */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground">Comments</span>
+                {detailComments === null && (
+                  <div className="inset-neu h-16 animate-pulse rounded-lg" aria-hidden />
+                )}
+                {detailComments?.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    No comments yet — the team may ask questions here.
+                  </p>
+                )}
+                {detailComments && detailComments.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {detailComments.map((c) => (
+                      <div key={c.id} className="inset-neu rounded-lg p-3">
+                        <p className="flex items-baseline gap-2">
+                          <span className="text-xs font-medium text-foreground">{c.user.name}</span>
+                          <span className="font-mono text-[10px] text-muted-foreground/60">
+                            {fmtDate(c.created_at)}
+                          </span>
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{c.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
+                  <Textarea
+                    className="inset-neu min-h-10 resize-none"
+                    rows={2}
+                    placeholder="Write a reply…"
+                    aria-label="Write a comment"
+                    value={commentBody}
+                    onChange={(e) => setCommentBody(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submitComment()
+                    }}
+                  />
+                  <Button
+                    size="icon-sm"
+                    aria-label="Add comment"
+                    disabled={sending || !commentBody.trim()}
+                    onClick={() => void submitComment()}
+                  >
+                    <SendIcon strokeWidth={1.5} />
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 Last updated {fmtDate(detail.updated_at)}
