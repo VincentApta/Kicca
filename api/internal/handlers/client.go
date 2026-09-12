@@ -148,9 +148,9 @@ type clientCommentAuthorJSON struct {
 // created_at, user:{name}}; team comments on the ticket are visible to the
 // client with the author name only.
 type clientCommentJSON struct {
-	ID        string                 `json:"id"`
-	Body      string                 `json:"body"`
-	CreatedAt time.Time              `json:"created_at"`
+	ID        string                  `json:"id"`
+	Body      string                  `json:"body"`
+	CreatedAt time.Time               `json:"created_at"`
 	User      clientCommentAuthorJSON `json:"user"`
 }
 

@@ -462,7 +462,8 @@ func TestUserDisableToggleSerialization(t *testing.T) {
 	}
 }
 
-func TestListUsersPagination(t *testing.T) {	app, _ := newTestApp(t)
+func TestListUsersPagination(t *testing.T) {
+	app, _ := newTestApp(t)
 	admin := loginAndGet(t, app, adminEmail, adminPass)
 	for i := 0; i < 3; i++ {
 		email := string(rune('a'+i)) + "@example.com"
@@ -703,5 +704,60 @@ func TestProjectTeams(t *testing.T) {
 	if status, _, _ := do(t, app, http.MethodPatch, "/api/projects/"+pid+"/teams",
 		`{"team_ids":[]}`, admin); status != http.StatusUnprocessableEntity {
 		t.Fatalf("empty: got %d, want 422", status)
+	}
+}
+
+// TestTeamGrantsProjectAccess: a user in a contributing team (but with no
+// explicit project_members row) can list + open the project; deleting a
+// contributing team is blocked while referenced.
+func TestTeamGrantsProjectAccess(t *testing.T) {
+	app, _ := newTestApp(t)
+	admin := loginAndGet(t, app, adminEmail, adminPass)
+
+	_, t1, _ := do(t, app, http.MethodPost, "/api/teams", `{"name":"Contrib A"}`, admin)
+	t1ID, _ := t1["id"].(string)
+
+	// outsider user in team A only
+	_, out := createUserViaAPI(t, app, admin, "out9@x.io", "longpass1", "member")
+	outID, _ := out["id"].(string)
+	if st, b, _ := do(t, app, http.MethodPut, "/api/teams/"+t1ID+"/members", `{"user_ids":["`+outID+`"]}`, admin); st != http.StatusOK {
+		t.Fatalf("add member: %d %v", st, b)
+	}
+	outCookie := loginAndGet(t, app, "out9@x.io", "longpass1")
+
+	// project with team A contributing (owner = team A itself)
+	_, proj, _ := do(t, app, http.MethodPost, "/api/projects",
+		`{"team_id":"`+t1ID+`","name":"Vis","key":"VIS"}`, admin)
+	pid, _ := proj["id"].(string)
+
+	// outsider sees project in list
+	status, list, _ := do(t, app, http.MethodGet, "/api/projects?page=1&per_page=50", "", outCookie)
+	if status != http.StatusOK {
+		t.Fatalf("list: %d", status)
+	}
+	found := false
+	for _, it := range list["data"].([]interface{}) {
+		if it.(map[string]interface{})["id"] == pid {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("team member cannot see contributing project")
+	}
+	// detail works, my_role = member (team-derived)
+	_, detail, _ := do(t, app, http.MethodGet, "/api/projects/"+pid, "", outCookie)
+	if detail["my_role"] != "member" {
+		t.Fatalf("my_role: got %v, want member", detail["my_role"])
+	}
+	// search finds it too
+	_, res, _ := do(t, app, http.MethodGet, "/api/search?q=vis", "", outCookie)
+	data, _ := res["data"].(map[string]interface{})
+	if n, _ := data["projects"].([]interface{}); len(n) != 1 {
+		t.Fatalf("search: got %d projects", len(n))
+	}
+
+	// delete blocked while contributing
+	if status, _, _ := do(t, app, http.MethodDelete, "/api/teams/"+t1ID, "", admin); status != http.StatusConflict {
+		t.Fatalf("team delete: got %d, want 409", status)
 	}
 }

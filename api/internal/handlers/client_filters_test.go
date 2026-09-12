@@ -39,8 +39,8 @@ func TestClientTicketSearchAndFilters(t *testing.T) {
 	app, gdb := newTestApp(t)
 	f, otherID, client := twoProjectsFixture(t, app)
 
-	_, t1 := clientTicketViaAPI(t, app, client, f.projectID, "Printer on fire")     // KIC, inbox
-	clientTicketViaAPI(t, app, client, otherID, "Slow VPN")                         // OTH, inbox
+	_, t1 := clientTicketViaAPI(t, app, client, f.projectID, "Printer on fire")      // KIC, inbox
+	clientTicketViaAPI(t, app, client, otherID, "Slow VPN")                          // OTH, inbox
 	_, t3 := clientTicketViaAPI(t, app, client, f.projectID, "Fixed already thanks") // KIC → done below
 	if err := gdb.Model(&models.Task{}).Where("id = ?", t3["id"]).Update("status", "done").Error; err != nil {
 		t.Fatalf("set done: %v", err)

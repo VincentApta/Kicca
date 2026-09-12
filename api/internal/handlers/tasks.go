@@ -410,7 +410,7 @@ func MyTasks(gdb *gorm.DB) fiber.Handler {
 		perPage := queryInt(c, "per_page", defaultPerPage)
 
 		// visible project ids for this user
-		visible := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
+		visible := visibleProjectIDs(gdb, u.ID)
 		scope := func() *gorm.DB {
 			q := gdb.Unscoped().Model(&models.Task{}).
 				Where("deleted_at IS NULL")

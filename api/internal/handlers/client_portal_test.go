@@ -110,7 +110,11 @@ func TestClientSeesOwnTicketsOnlyNoAssessment(t *testing.T) {
 		t.Fatalf("c2 ticket: %d", status)
 	}
 
-	for _, tc := range []struct{ cookie string; wantTotal float64; wantTitle string }{
+	for _, tc := range []struct {
+		cookie    string
+		wantTotal float64
+		wantTitle string
+	}{
 		{c1, 2, "Mine two"}, // newest-updated first
 		{c2, 1, "Theirs"},
 	} {

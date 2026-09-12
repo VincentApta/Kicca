@@ -110,7 +110,7 @@ func ExportTasks(gdb *gorm.DB) fiber.Handler {
 			q = q.Where("project_id = ?", p.ID)
 			name = "kica-" + strings.ToLower(p.Key) + "-tasks-" + time.Now().UTC().Format("20060102") + ".csv"
 		} else if u.GlobalRole != roleAdmin {
-			visible := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
+			visible := visibleProjectIDs(gdb, u.ID)
 			q = q.Where("project_id IN (?)", visible)
 		}
 		var tasks []models.Task

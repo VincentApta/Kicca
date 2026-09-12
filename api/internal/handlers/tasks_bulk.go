@@ -21,8 +21,8 @@ import (
 )
 
 type bulkPatchReq struct {
-	IDs        []string       `json:"ids"`
-	Status     *string        `json:"status"`
+	IDs        []string        `json:"ids"`
+	Status     *string         `json:"status"`
 	AssigneeID json.RawMessage `json:"assignee_id"` // uuid string | null (unassign)
 }
 

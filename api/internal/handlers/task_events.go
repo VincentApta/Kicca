@@ -154,7 +154,7 @@ func TaskEvents(gdb *gorm.DB) fiber.Handler {
 		if projectID != "" {
 			scope = scope.Where("project_id = ?", projectID)
 		} else if u.GlobalRole != roleAdmin {
-			visible := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
+			visible := visibleProjectIDs(gdb, u.ID)
 			scope = scope.Where("project_id IN (?)", visible)
 		}
 		var ids []string

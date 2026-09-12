@@ -109,8 +109,16 @@ func loadVisibleProject(c *fiber.Ctx, gdb *gorm.DB, u *models.User, id string) (
 	}
 	var pm models.ProjectMember
 	if err := gdb.First(&pm, "project_id = ? AND user_id = ?", p.ID, u.ID).Error; err != nil {
-		httpErr(c, fiber.StatusNotFound, "not_found", "no such project")
-		return nil, nil, false
+		// no explicit row: grant plain-member access via contributing team
+		var viaTeam int64
+		if err := gdb.Table("project_teams pt").
+			Joins("JOIN team_members tm ON tm.team_id = pt.team_id").
+			Where("pt.project_id = ? AND tm.user_id = ?", p.ID, u.ID).
+			Count(&viaTeam).Error; err != nil || viaTeam == 0 {
+			httpErr(c, fiber.StatusNotFound, "not_found", "no such project")
+			return nil, nil, false
+		}
+		return &p, nil, true
 	}
 	return &p, &pm, true
 }
@@ -124,8 +132,7 @@ func ListProjects(gdb *gorm.DB) fiber.Handler {
 		scope := func() *gorm.DB {
 			q := gdb.Model(&models.Project{})
 			if u.GlobalRole != roleAdmin {
-				memberOf := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
-				q = q.Where("id IN (?)", memberOf)
+				q = q.Where("id IN (?)", visibleProjectIDs(gdb, u.ID))
 			}
 			return q
 		}
@@ -261,8 +268,12 @@ func GetProject(gdb *gorm.DB) fiber.Handler {
 		if !ok {
 			return nil
 		}
-		myRole := roleAdmin
-		if pm != nil {
+		// global admins and explicit rows carry their role; team-derived
+		// access (pm == nil, non-admin) is plain member.
+		myRole := roleMember
+		if u.GlobalRole == roleAdmin {
+			myRole = roleAdmin
+		} else if pm != nil {
 			myRole = pm.Role
 		}
 		members, err := projectMembersJSON(gdb, p.ID)

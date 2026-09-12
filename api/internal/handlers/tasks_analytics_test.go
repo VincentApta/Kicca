@@ -5,8 +5,8 @@ package handlers
 
 import (
 	"net/http"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -23,7 +23,8 @@ func moveTaskViaAPI(t *testing.T, app *fiber.App, cookie, taskID, status string)
 }
 
 // taskEventsFor loads the transition log ordered oldest-first.
-func taskEventsFor(t *testing.T, gdb *gorm.DB, taskID string) []models.TaskEvent {	t.Helper()
+func taskEventsFor(t *testing.T, gdb *gorm.DB, taskID string) []models.TaskEvent {
+	t.Helper()
 	var evs []models.TaskEvent
 	if err := gdb.Where("task_id = ?", taskID).Order("at").Find(&evs).Error; err != nil {
 		t.Fatalf("load task_events: %v", err)

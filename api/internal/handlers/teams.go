@@ -35,6 +35,18 @@ type replaceTeamMembersReq struct {
 }
 
 // currentUser is the *models.User stashed by RequireAuth/RequireAdmin.
+// visibleProjectIDs: project ids the user can see — explicit membership OR
+// membership in any contributing team (project_teams x team_members).
+// Team-derived access is plain member; explicit rows keep their role.
+func visibleProjectIDs(gdb *gorm.DB, userID string) *gorm.DB {
+	direct := gdb.Table("project_members").Select("project_id").Where("user_id = ?", userID)
+	viaTeam := gdb.Table("project_teams pt").
+		Select("pt.project_id").
+		Joins("JOIN team_members tm ON tm.team_id = pt.team_id").
+		Where("tm.user_id = ?", userID)
+	return gdb.Table("(? UNION ?)", direct, viaTeam)
+}
+
 func currentUser(c *fiber.Ctx) *models.User {
 	return c.Locals(middleware.UserKey).(*models.User)
 }
@@ -213,8 +225,12 @@ func DeleteTeam(gdb *gorm.DB) fiber.Handler {
 		if err := gdb.Unscoped().Model(&models.Project{}).Where("team_id = ?", id).Count(&projects).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not count projects")
 		}
-		if projects > 0 {
-			return httpErr(c, fiber.StatusConflict, "team_has_projects", "team still has projects")
+		var contributing int64
+		if err := gdb.Model(&models.ProjectTeam{}).Where("team_id = ?", id).Count(&contributing).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not count contributing projects")
+		}
+		if projects+contributing > 0 {
+			return httpErr(c, fiber.StatusConflict, "team_has_projects", "team still owns or contributes to projects")
 		}
 		// members deleted explicitly: sqlite (tests) has no FK cascade.
 		err := gdb.Transaction(func(tx *gorm.DB) error {

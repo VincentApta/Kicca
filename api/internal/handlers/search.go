@@ -47,7 +47,7 @@ func Search(gdb *gorm.DB) fiber.Handler {
 		// member scoping — same predicate shape as ListProjects
 		scope := gdb.Model(&models.Project{})
 		if u.GlobalRole != roleAdmin {
-			visible := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
+			visible := visibleProjectIDs(gdb, u.ID)
 			scope = scope.Where("id IN (?)", visible)
 		}
 
@@ -67,7 +67,7 @@ func Search(gdb *gorm.DB) fiber.Handler {
 			Where("tasks.deleted_at IS NULL").
 			Where("(LOWER(tasks.title) LIKE ? OR LOWER(tasks.description) LIKE ?)", like, like)
 		if u.GlobalRole != roleAdmin {
-			visible := gdb.Model(&models.ProjectMember{}).Select("project_id").Where("user_id = ?", u.ID)
+			visible := visibleProjectIDs(gdb, u.ID)
 			tq = tq.Where("tasks.project_id IN (?)", visible)
 		}
 		var tasks []searchTaskJSON

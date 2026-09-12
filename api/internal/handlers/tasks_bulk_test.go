@@ -141,13 +141,13 @@ func TestBulkValidationAllOrNothing(t *testing.T) {
 
 	// request-level validation → 422
 	for name, payload := range map[string]string{
-		"empty ids":    `{"ids":[],"status":"done"}`,
-		"dup ids":      fmt.Sprintf(`{"ids":[%q,%q],"status":"done"}`, a, a),
-		"no action":    fmt.Sprintf(`{"ids":[%q]}`, a),
-		"bad status":   fmt.Sprintf(`{"ids":[%q],"status":"nope"}`, a),
-		"bad assignee": fmt.Sprintf(`{"ids":[%q],"assignee_id":"not-a-uuid"}`, a),
+		"empty ids":        `{"ids":[],"status":"done"}`,
+		"dup ids":          fmt.Sprintf(`{"ids":[%q,%q],"status":"done"}`, a, a),
+		"no action":        fmt.Sprintf(`{"ids":[%q]}`, a),
+		"bad status":       fmt.Sprintf(`{"ids":[%q],"status":"nope"}`, a),
+		"bad assignee":     fmt.Sprintf(`{"ids":[%q],"assignee_id":"not-a-uuid"}`, a),
 		"unknown assignee": fmt.Sprintf(`{"ids":[%q],"assignee_id":%q}`, a, "00000000-0000-0000-0000-000000000000"),
-		"bad json":     `{`,
+		"bad json":         `{`,
 	} {
 		if status, _ := bulk(t, app, f.pm, payload); status != http.StatusUnprocessableEntity && status != http.StatusBadRequest {
 			t.Fatalf("%s: got %d, want 422/400", name, status)
