@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PlusIcon, RotateCcwIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Sidebar, type View } from './sidebar'
 import { Topbar } from './topbar'
 import { LoginPage } from './login-page'
@@ -12,12 +20,13 @@ import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from '.
 import { ProfilePage } from './profile-page'
 import MyTasksPage from './my-tasks-page'
 import { DashboardPage } from './dashboard-page'
+import { ProjectAnalyticsPage } from './project-analytics'
 import { ProjectsListPage } from './projects-list-page'
 import { BoardSkeleton, EmptyState, ListSkeleton } from './skeletons'
 import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
 import { useToast } from '@/lib/toast'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import {
   EMPTY_FILTERS,
   STATUS_LABEL,
@@ -51,6 +60,10 @@ export function Workspace() {
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [createStatus, setCreateStatus] = useState<Status | null>(null)
   const [firstOpen, setFirstOpen] = useState(false)
+  // multi-select (issue #46)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
 
   const me = state.phase === 'authenticated' ? state.user : null
   const project = projects?.find((p) => p.id === currentProjectId) ?? null
@@ -101,6 +114,11 @@ export function Workspace() {
     }, 250)
     return () => clearTimeout(t)
   }, [search])
+
+  // selection only makes sense on the board/list surfaces
+  useEffect(() => {
+    if (view !== 'board' && view !== 'list') exitSelect()
+  }, [view])
 
   // task fetch: server-side q/assignee/priority/label; status only for trash
   useEffect(() => {
@@ -229,6 +247,71 @@ export function Workspace() {
     )
   }
 
+  // ---- multi-select bulk actions (issue #46) — optimistic + reconcile ----
+
+  function exitSelect() {
+    setSelectMode(false)
+    setSelected(new Set())
+  }
+
+  // escape leaves select mode
+  useEffect(() => {
+    if (!selectMode) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') exitSelect()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectMode])
+
+  function toggleSelect(id: string, shiftKey: boolean) {
+    if (shiftKey && !selectMode) setSelectMode(true)
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleBulk(action: { status?: Status; assignee_id?: string | null }) {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    const snapshot = tasks
+    const member = members.find((m) => m.user_id === action.assignee_id) ?? null
+    setTasks((ts) =>
+      action.status === 'trash'
+        ? ts.filter((t) => !selected.has(t.id))
+        : ts.map((t) =>
+            selected.has(t.id)
+              ? {
+                  ...t,
+                  ...(action.status ? { status: action.status } : {}),
+                  ...(action.assignee_id !== undefined
+                    ? {
+                        assignee: member
+                          ? { id: member.user_id, email: member.email, name: member.name, global_role: 'member' as const }
+                          : null,
+                      }
+                    : {}),
+                }
+              : t,
+          ),
+    )
+    try {
+      const { data } = await api.bulkTasks(ids, action)
+      setTasks((ts) => ts.map((t) => data.find((d) => d.id === t.id) ?? t))
+      if (action.status === 'trash') toast(`Moved ${ids.length} to trash`)
+      else if (action.status) toast(`Moved ${ids.length} to ${STATUS_LABEL[action.status]}`)
+      else if (action.assignee_id === null) toast(`Unassigned ${ids.length}`)
+      else toast(`Assigned ${ids.length}`)
+      exitSelect()
+    } catch (e) {
+      setTasks(snapshot)
+      toast(e instanceof ApiError ? e.message : 'Bulk action failed', 'error')
+    }
+  }
+
   async function handleCreate(body: {
     title: string
     description?: string
@@ -251,6 +334,7 @@ export function Workspace() {
   function switchProject(id: string) {
     setCurrentProjectId(id)
     setDrawerId(null)
+    exitSelect()
     try {
       localStorage.setItem('kica-project', id)
     } catch {
@@ -271,7 +355,7 @@ export function Workspace() {
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
         currentProjectId={null} onSwitchProject={switchProject}
         onNavigate={setView} onMyTasks={() => setView('mytasks')} myTasksActive={false}
-        settingsAvailable={false} onExport={handleExport}>
+        settingsAvailable={false} selectMode={false} onExport={handleExport}>
         {view === 'teams' ? (
           <TeamsPage />
         ) : view === 'users' ? (
@@ -341,6 +425,15 @@ export function Workspace() {
       onMyTasks={() => setView('mytasks')}
       myTasksActive={view === 'mytasks'}
       settingsAvailable={canManageProject}
+      selectMode={selectMode && (view === 'board' || view === 'list')}
+      selectedCount={selected.size}
+      onToggleSelectMode={() => {
+        setSelectMode(true)
+      }}
+      onExitSelect={exitSelect}
+      onBulkStatus={(s) => handleBulk({ status: s })}
+      onBulkAssign={(id) => handleBulk({ assignee_id: id })}
+      onBulkDelete={() => setConfirmBulkDelete(true)}
       onExport={handleExport}
     >
       {view === 'overview' ? (
@@ -374,6 +467,18 @@ export function Workspace() {
               setCurrentProjectId(null)
               refreshProject()
               setView('projects')
+            }}
+          />
+        ) : (
+          <BootSkeleton />
+        )
+      ) : view === 'analytics' ? (
+        project ? (
+          <ProjectAnalyticsPage
+            project={project}
+            onSelectTask={(taskId) => {
+              setView('board')
+              setTimeout(() => setDrawerId(taskId), 50)
             }}
           />
         ) : (
@@ -427,7 +532,14 @@ export function Workspace() {
           />
         ) : (
           <div className="flex flex-1 flex-col overflow-hidden">
-            <ListView tasks={shown} projectKey={project?.key ?? ''} onOpen={setDrawerId} />
+            <ListView
+              tasks={shown}
+              projectKey={project?.key ?? ''}
+              onOpen={setDrawerId}
+              selectable={selectMode}
+              selectedIds={selected}
+              onSelect={toggleSelect}
+            />
             <LoadMore hasMore={hasMore} loading={loadingMore} onLoadMore={loadMore} />
           </div>
         )
@@ -448,6 +560,9 @@ export function Workspace() {
             onOpen={setDrawerId}
             onAdd={setCreateStatus}
             onMove={handleMove}
+            selectable={selectMode}
+            selectedIds={selected}
+            onSelect={toggleSelect}
           />
           {hasMore && <LoadMore hasMore loading={loadingMore} onLoadMore={loadMore} />}
         </>
@@ -473,6 +588,30 @@ export function Workspace() {
         onTrash={handleTrash}
         onGhLink={handleGhLink}
       />
+
+      <Dialog open={confirmBulkDelete} onOpenChange={(o) => !o && setConfirmBulkDelete(false)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Move {selected.size} {selected.size === 1 ? 'task' : 'tasks'} to trash?</DialogTitle>
+            <DialogDescription>
+              They can be restored from Trash one by one.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmBulkDelete(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmBulkDelete(false)
+                handleBulk({ status: 'trash' })
+              }}
+            >
+              Move to trash
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {me?.global_role === 'admin' && (
         <FirstProjectDialog
@@ -518,6 +657,13 @@ type ShellProps = {
   onMyTasks: () => void
   myTasksActive: boolean
   settingsAvailable: boolean
+  selectMode?: boolean
+  selectedCount?: number
+  onToggleSelectMode?: () => void
+  onExitSelect?: () => void
+  onBulkStatus?: (s: Status) => void
+  onBulkAssign?: (id: string | null) => void
+  onBulkDelete?: () => void
   onExport: () => void
 }
 
@@ -551,6 +697,13 @@ function ShellFrame({ children, ...shell }: ShellProps) {
           me={shell.me}
           onProfile={shell.onProfile}
           onLogout={shell.onLogout}
+          selectMode={shell.selectMode}
+          selectedCount={shell.selectedCount}
+          onToggleSelectMode={shell.onToggleSelectMode}
+          onExitSelect={shell.onExitSelect}
+          onBulkStatus={shell.onBulkStatus}
+          onBulkAssign={shell.onBulkAssign}
+          onBulkDelete={shell.onBulkDelete}
           onExport={shell.onExport}
         />
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>

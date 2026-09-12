@@ -1,3 +1,4 @@
+import { CheckIcon } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -25,17 +26,24 @@ export function ListView({
   projectKey,
   onOpen,
   rowAction,
+  selectable = false,
+  selectedIds,
+  onSelect,
 }: {
   tasks: Task[]
   projectKey: string
   onOpen: (id: string) => void
   rowAction?: (task: Task) => React.ReactNode
+  selectable?: boolean // multi-select mode (issue #46)
+  selectedIds?: Set<string>
+  onSelect?: (id: string, shiftKey: boolean) => void
 }) {
   return (
     <div className="flex-1 overflow-auto p-4 pb-8">
       <Table className="min-w-160">
         <TableHeader>
           <TableRow className="sticky top-0 z-10 bg-background hover:bg-background">
+            {selectable && <TableHead className="w-10" aria-label="Selected" />}
             <TableHead className="w-24">Key</TableHead>
             <TableHead>Title</TableHead>
             <TableHead className="w-28">Status</TableHead>
@@ -52,12 +60,31 @@ export function ListView({
             <TableRow
               key={t.id}
               tabIndex={0}
-              onClick={() => onOpen(t.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onOpen(t.id)
+              aria-pressed={selectable ? (selectedIds?.has(t.id) ?? false) : undefined}
+              onClick={(e) => {
+                if (selectable || e.shiftKey) onSelect?.(t.id, e.shiftKey)
+                else onOpen(t.id)
               }}
-              className="cursor-pointer"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (selectable || e.shiftKey) onSelect?.(t.id, e.shiftKey)
+                  else onOpen(t.id)
+                }
+              }}
+              className={`cursor-pointer ${selectable && selectedIds?.has(t.id) ? 'outline-2 -outline-offset-2 outline-primary' : ''}`}
             >
+              {selectable && (
+                <TableCell>
+                  <span
+                    aria-hidden
+                    className={`flex size-5 items-center justify-center rounded-md ${
+                      selectedIds?.has(t.id) ? 'bg-primary/15 text-primary' : 'inset-neu text-transparent'
+                    }`}
+                  >
+                    <CheckIcon className="size-3.5" strokeWidth={2} />
+                  </span>
+                </TableCell>
+              )}
               <TableCell>
                 <TaskKey taskKey={taskKey(projectKey, t)} status={t.status} />
               </TableCell>

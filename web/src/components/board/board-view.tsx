@@ -20,15 +20,22 @@ export function BoardView({
   onOpen,
   onAdd,
   onMove,
+  selectable = false,
+  selectedIds,
+  onSelect,
 }: {
   tasks: Task[]
   projectKey: string
   onOpen: (id: string) => void
   onAdd: (status: Status) => void
   onMove: (dragId: string, toStatus: Status, toIndex: number | null) => void
+  selectable?: boolean // multi-select mode hides dnd (issue #46)
+  selectedIds?: Set<string>
+  onSelect?: (id: string, shiftKey: boolean) => void
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  const activeSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  const sensors = selectable ? [] : activeSensors
 
   function onDragStart(e: DragStartEvent) {
     setDragId(String(e.active.id))
@@ -80,6 +87,9 @@ export function BoardView({
             projectKey={projectKey}
             onOpen={onOpen}
             onAdd={onAdd}
+            selectable={selectable}
+            selectedIds={selectedIds}
+            onSelect={onSelect}
           />
         ))}
       </div>

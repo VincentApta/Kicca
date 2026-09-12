@@ -1,4 +1,5 @@
 import {
+  ChartLineIcon,
   ChevronLeftIcon,
   ChevronsLeftIcon,
   FoldersIcon,
@@ -12,7 +13,7 @@ import {
 } from 'lucide-react'
 import type { User } from '@/lib/types'
 
-export type View = 'overview' | 'projects' | 'mytasks' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings' | 'profile'
+export type View = 'overview' | 'projects' | 'mytasks' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings' | 'analytics' | 'profile'
 
 function NavButton({
   label,
@@ -148,6 +149,15 @@ export function Sidebar({
               active={view === 'board' || view === 'list' || view === 'trash'}
               collapsed={collapsed}
               onClick={() => onNavigate('board')}
+            />
+          )}
+          {currentProjectId && (
+            <NavButton
+              label="Analytics"
+              icon={<ChartLineIcon className="size-4 shrink-0" strokeWidth={1.5} />}
+              active={view === 'analytics'}
+              collapsed={collapsed}
+              onClick={() => onNavigate('analytics')}
             />
           )}
           {settingsAvailable && (

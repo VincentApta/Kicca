@@ -1,4 +1,5 @@
 import { useSortable } from '@dnd-kit/sortable'
+import { CheckIcon } from 'lucide-react'
 import { GithubIcon } from '@/components/github-icon'
 import { CSS } from '@dnd-kit/utilities'
 import { PriorityDot, TaskKey } from './priority-dot'
@@ -9,36 +10,62 @@ export function TaskCard({
   task,
   projectKey,
   onOpen,
+  selectable = false,
+  selected = false,
+  onSelect,
 }: {
   task: Task
   projectKey: string
   onOpen: (id: string) => void
+  selectable?: boolean // multi-select mode: checkbox + click selects, no dnd
+  selected?: boolean
+  onSelect?: (id: string, shiftKey: boolean) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: 'task', status: task.status },
   })
+  const drag = !selectable
 
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      {...attributes}
-      {...listeners}
+      {...(drag ? attributes : {})}
+      {...(drag ? listeners : {})}
       role="button"
       tabIndex={0}
       aria-label={`${taskKey(projectKey, task)} ${task.title}`}
-      onClick={() => onOpen(task.id)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+      aria-pressed={selectable ? selected : undefined}
+      onClick={(e) => {
+        if (selectable || e.shiftKey) {
           e.preventDefault()
+          onSelect?.(task.id, e.shiftKey)
+        } else {
           onOpen(task.id)
         }
       }}
-      className={`card-neu cursor-grab p-3 text-left select-none active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-ring ${
-        isDragging ? 'opacity-40' : ''
-      }`}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          if (selectable || e.shiftKey) onSelect?.(task.id, e.shiftKey)
+          else onOpen(task.id)
+        }
+      }}
+      className={`card-neu p-3 text-left select-none focus-visible:outline-2 focus-visible:outline-ring ${
+        drag ? 'cursor-grab active:cursor-grabbing' : ''
+      } ${selected ? 'outline-2 -outline-offset-2 outline-primary' : ''} ${isDragging ? 'opacity-40' : ''}`}
     >
+      {selectable && (
+        <span
+          aria-hidden
+          className={`mb-2 flex size-5 items-center justify-center rounded-md ${
+            selected ? 'bg-primary/15 text-primary' : 'inset-neu text-transparent'
+          }`}
+        >
+          <CheckIcon className="size-3.5" strokeWidth={2} />
+        </span>
+      )}
       <CardBody task={task} projectKey={projectKey} />
     </div>
   )
