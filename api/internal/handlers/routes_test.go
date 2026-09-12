@@ -593,3 +593,63 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("member unread after read: got %d, want 0", len(notifs))
 	}
 }
+
+// TestSearch: cross-project search; member scoping; q<2 empty; client 403.
+func TestSearch(t *testing.T) {
+	app, _ := newTestApp(t)
+	admin := loginAndGet(t, app, adminEmail, adminPass)
+
+	// team + two projects, one task each
+	_, tm, _ := do(t, app, http.MethodPost, "/api/teams", `{"name":"Search Team"}`, admin)
+	teamID, _ := tm["id"].(string)
+	_, p1, _ := do(t, app, http.MethodPost, "/api/projects", `{"team_id":"`+teamID+`","name":"Alpha Search","key":"ASRCH"}`, admin)
+	_, p2, _ := do(t, app, http.MethodPost, "/api/projects", `{"team_id":"`+teamID+`","name":"Beta Zone","key":"BZON"}`, admin)
+	p1ID, _ := p1["id"].(string)
+	p2ID, _ := p2["id"].(string)
+	do(t, app, http.MethodPost, "/api/projects/"+p1ID+"/tasks", `{"title":"needle in alpha"}`, admin)
+	do(t, app, http.MethodPost, "/api/projects/"+p2ID+"/tasks", `{"title":"nothing here"}`, admin)
+
+	// admin: finds task + project by fragment
+	status, body, _ := do(t, app, http.MethodGet, "/api/search?q=needl", "", admin)
+	if status != http.StatusOK {
+		t.Fatalf("search: got %d", status)
+	}
+	data := body["data"].(map[string]interface{})
+	tasks := data["tasks"].([]interface{})
+	projs := data["projects"].([]interface{})
+	if len(tasks) != 1 || len(projs) != 0 {
+		t.Fatalf("admin search tasks=%d projs=%d, want 1/0", len(tasks), len(projs))
+	}
+	status, body, _ = do(t, app, http.MethodGet, "/api/search?q=alpha", "", admin)
+	data = body["data"].(map[string]interface{})
+	if projs := data["projects"].([]interface{}); len(projs) != 1 {
+		t.Fatalf("project search: got %d, want 1", len(projs))
+	}
+
+	// member with no membership: sees nothing
+	mEmail, mPass := "searchmember@example.com", "searchmember-pass-1"
+	createUserViaAPI(t, app, admin, mEmail, mPass, "member")
+	member := loginAndGet(t, app, mEmail, mPass)
+	status, body, _ = do(t, app, http.MethodGet, "/api/search?q=needl", "", member)
+	if status != http.StatusOK {
+		t.Fatalf("member search: got %d", status)
+	}
+	data = body["data"].(map[string]interface{})
+	if tasks := data["tasks"].([]interface{}); len(tasks) != 0 {
+		t.Fatalf("member leak: got %d tasks, want 0", len(tasks))
+	}
+
+	// short q → empty
+	status, body, _ = do(t, app, http.MethodGet, "/api/search?q=n", "", admin)
+	if status != http.StatusOK {
+		t.Fatalf("short q: got %d", status)
+	}
+	// client 403 (client linked to p1 so creation is valid)
+	cEmail, cPass := "searchclient@example.com", "searchclient-pass-1"
+	do(t, app, http.MethodPost, "/api/users",
+		`{"email":"`+cEmail+`","name":"Client","password":"`+cPass+`","global_role":"client","project_ids":["`+p1ID+`"]}`, admin)
+	client := loginAndGet(t, app, cEmail, cPass)
+	if status, _, _ := do(t, app, http.MethodGet, "/api/search?q=needl", "", client); status != http.StatusForbidden {
+		t.Fatalf("client search: got %d, want 403", status)
+	}
+}

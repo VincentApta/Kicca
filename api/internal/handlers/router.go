@@ -109,6 +109,9 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	notif.Get("/", ListNotifications(gdb))
 	notif.Post("/read", MarkNotificationsRead(gdb))
 
+	// global search — team only (clients have their own ticket search)
+	api.Get("/search", middleware.RequireTeam(jwtSecret, gdb), Search(gdb))
+
 	// client portal — clients only (team users get 403). Static group before
 	// nothing parametric; registered last per the static-first convention.
 	client := api.Group("/client", middleware.RequireClient(jwtSecret, gdb))
