@@ -224,8 +224,9 @@ export function Workspace() {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, gh_link: link } : t)))
   }
 
-  // CSV export of the current filtered view (#50) — mirrors the fetch params
-  function handleExport() {
+  // CSV export of the current filtered view (#50) — mirrors the fetch params.
+  // range: optional created_at from/to (inclusive) from the export popover.
+  function handleExport(range?: { from?: string; to?: string }) {
     if (!currentProjectId) return
     api.exportTasks({
       project_id: currentProjectId,
@@ -234,6 +235,7 @@ export function Workspace() {
       priority: filters.priority,
       label: filters.label_id,
       status: trashMode ? 'trash' : filters.status,
+      ...range,
     })
   }
 

@@ -171,9 +171,13 @@ describe('ClientPortal comments (#43)', () => {
       .mockImplementation(function (this: HTMLAnchorElement) {
         hrefs.push(this.getAttribute('href') ?? '')
       })
-    const exportBtn = document.querySelector('[aria-label="Export my tickets as CSV"]') as HTMLButtonElement
+    const exportBtn = document.querySelector('[aria-label="Export Export as CSV"]') as HTMLButtonElement
     await act(async () => {
-      exportBtn.click()
+      exportBtn.click() // open popover
+    })
+    const go = [...document.querySelectorAll('button')].filter((b) => b.textContent === 'Export').pop() as HTMLButtonElement
+    await act(async () => {
+      go.click() // confirm
     })
     clickSpy.mockRestore()
     expect(hrefs).toContain('/api/client/tickets/export?q=printer')

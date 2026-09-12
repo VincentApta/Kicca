@@ -47,12 +47,16 @@ describe('Topbar export button (#50)', () => {
         />,
       )
     })
-    const btn = document.querySelector('[aria-label="Export the current task list as CSV"]') as HTMLButtonElement
+    const btn = document.querySelector('[aria-label="Export Export as CSV"]') as HTMLButtonElement
     expect(btn).toBeTruthy()
     await act(async () => {
-      btn.click()
+      btn.click() // open popover
     })
-    expect(onExport).toHaveBeenCalledTimes(1)
+    const go = [...document.querySelectorAll('button')].filter((b) => b.textContent === 'Export').pop() as HTMLButtonElement
+    await act(async () => {
+      go.click() // confirm export (empty range)
+    })
+    expect(onExport).toHaveBeenCalledWith({})
   })
 
   it('stays hidden outside the board/list/trash views', async () => {

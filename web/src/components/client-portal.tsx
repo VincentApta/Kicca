@@ -3,10 +3,11 @@
 // team nav; assessment and other team-only fields are never rendered (the
 // API doesn't even send them).
 import { useEffect, useState, type FormEvent } from 'react'
-import { DownloadIcon, LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
+import { LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import { NotificationBell } from '@/components/notifications'
+import { ExportRangeButton } from '@/components/export-range'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -217,21 +218,16 @@ export function ClientPortal() {
               {me.name} <span className="font-mono text-xs">({me.email})</span>
             </span>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
+          <ExportRangeButton
+            onExport={(range) =>
               api.clientExportTickets({
                 q: ticketsQ || undefined,
                 project_id: filterProject || undefined,
                 status: filterStatus === '' ? undefined : (filterStatus as 'open' | 'closed'),
+                ...range,
               })
             }
-            aria-label="Export my tickets as CSV"
-          >
-            <DownloadIcon strokeWidth={1.5} />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
+          />
           <NotificationBell
             onOpenTask={(taskId: string) => {
               // refetch list (may be filtered), find the ticket, open detail

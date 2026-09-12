@@ -254,9 +254,10 @@ export const api = {
   clientAddTicketComment: (ticketId: string, body: string) =>
     req<ClientComment>(`/client/tickets/${ticketId}/comments`, { method: 'POST', body: { body } }),
 
-  // CSV export (#50) — same filters as the corresponding list endpoints
+  // CSV export (#50) — same filters as the corresponding list endpoints.
+  // from/to: optional inclusive created_at date range (YYYY-MM-DD).
   exportTasks: (
-    f: { project_id?: string; status?: string; assignee_id?: string; priority?: string; label?: string; q?: string } = {},
+    f: { project_id?: string; status?: string; assignee_id?: string; priority?: string; label?: string; q?: string; from?: string; to?: string } = {},
   ) => {
     const p = new URLSearchParams()
     for (const [k, v] of Object.entries(f)) {
@@ -265,7 +266,7 @@ export const api = {
     const qs = p.toString()
     downloadCsv(`/api/tasks/export${qs ? `?${qs}` : ''}`)
   },
-  clientExportTickets: (f: { q?: string; project_id?: string; status?: 'open' | 'closed' } = {}) => {
+  clientExportTickets: (f: { q?: string; project_id?: string; status?: 'open' | 'closed'; from?: string; to?: string } = {}) => {
     const p = new URLSearchParams()
     for (const [k, v] of Object.entries(f)) {
       if (v !== undefined && v !== '') p.set(k, v)

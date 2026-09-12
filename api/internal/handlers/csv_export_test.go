@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -209,5 +210,44 @@ func TestClientExportTicketsOwnScope(t *testing.T) {
 	// team users never reach the client surface
 	if status, _, _ := doRaw(t, app, http.MethodGet, "/api/client/tickets/export", f.pm); status != http.StatusForbidden {
 		t.Fatalf("team client export: got %d, want 403", status)
+	}
+}
+
+// TestExportDateRange: ?from=&to= (inclusive) filter by created_at on both
+// exports; malformed dates 422.
+func TestExportDateRange(t *testing.T) {
+	app, gdb := newTestApp(t)
+	f := newProjectFixture(t, app)
+	status, a := createTaskViaAPI(t, app, f.pa, f.projectID, `{"title":"old task"}`)
+	if status != http.StatusCreated {
+		t.Fatalf("create old: got %d", status)
+	}
+	// backdate first task to 10 days ago
+	gdb.Exec("UPDATE tasks SET created_at = ? WHERE id = ?", time.Now().AddDate(0, 0, -10), a["id"])
+	status, b := createTaskViaAPI(t, app, f.pa, f.projectID, `{"title":"new task"}`)
+	if status != http.StatusCreated {
+		t.Fatalf("create new: got %d", status)
+	}
+	_ = b
+
+	q := "/api/tasks/export?project_id=" + f.projectID
+	// from = yesterday → only the new task
+	_, raw, _ := doRaw(t, app, http.MethodGet, q+"&from="+time.Now().AddDate(0, 0, -1).Format("2006-01-02"), f.pa)
+	if rows := readCSV(t, raw); len(rows) != 2 {
+		t.Fatalf("from filter rows: got %d, want 2", len(rows))
+	}
+	// to = yesterday (inclusive) → only the old task
+	_, raw, _ = doRaw(t, app, http.MethodGet, q+"&to="+time.Now().AddDate(0, 0, -1).Format("2006-01-02"), f.pa)
+	if rows := readCSV(t, raw); len(rows) != 2 {
+		t.Fatalf("to filter rows: got %d, want 2", len(rows))
+	}
+	// full range → both
+	_, raw, _ = doRaw(t, app, http.MethodGet, q+"&from=2000-01-01&to=2999-01-01", f.pa)
+	if rows := readCSV(t, raw); len(rows) != 3 {
+		t.Fatalf("full range rows: got %d, want 3", len(rows))
+	}
+	// malformed → 422
+	if status, _, _ := doRaw(t, app, http.MethodGet, q+"&from=junk", f.pa); status != http.StatusUnprocessableEntity {
+		t.Fatalf("malformed from: got %d, want 422", status)
 	}
 }

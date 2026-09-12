@@ -2,7 +2,8 @@
 // a text/csv attachment of the CURRENT filtered view — same filters and the
 // same visibility scoping as the list endpoints (shared builders in
 // tasks.go / client.go). encoding/csv does RFC4180 quoting (quote+double);
-// the UTF-8 BOM makes Excel open it correctly. `ponytail:` no date-range or
+// the UTF-8 BOM makes Excel open it correctly. Optional ?from=&to=
+// (YYYY-MM-DD, inclusive) filters by created_at. `ponytail:` no other
 // format options v1.
 package handlers
 
@@ -48,14 +49,51 @@ func csvInt(i *int) string {
 	return strconv.Itoa(*i)
 }
 
+// parseDateRange reads ?from=&to= (YYYY-MM-DD) and returns the inclusive
+// [start, end) time range. from → start of day; to → start of NEXT day
+// (inclusive date). Either may be empty. Non-empty but malformed → error msg.
+func parseDateRange(c *fiber.Ctx) (time.Time, time.Time, string) {
+	var from, to time.Time
+	if s := c.Query("from"); s != "" {
+		t, err := time.Parse("2006-01-02", s)
+		if err != nil {
+			return from, to, "from must be YYYY-MM-DD"
+		}
+		from = t
+	}
+	if s := c.Query("to"); s != "" {
+		t, err := time.Parse("2006-01-02", s)
+		if err != nil {
+			return from, to, "to must be YYYY-MM-DD"
+		}
+		to = t.AddDate(0, 0, 1) // inclusive day
+	}
+	return from, to, ""
+}
+
+// applyDateRange filters tasks by created_at within [from, to).
+func applyDateRange(q *gorm.DB, from, to time.Time) *gorm.DB {
+	if !from.IsZero() {
+		q = q.Where("created_at >= ?", from)
+	}
+	if !to.IsZero() {
+		q = q.Where("created_at < ?", to)
+	}
+	return q
+}
+
 // ExportTasks: GET /api/tasks/export?project_id=&status=&assignee_id=&
-// priority=&label=&q= — team export. project_id optional: given → one
+// priority=&label=&q=&from=&to= — team export. project_id optional: given → one
 // visible project (404 no-leak otherwise, same as the list); omitted → all
 // visible projects (MyTasks scope).
 func ExportTasks(gdb *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		u := currentUser(c)
 		f, msg := parseTaskListFilters(c)
+		if msg != "" {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", msg)
+		}
+		from, to, msg := parseDateRange(c)
 		if msg != "" {
 			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", msg)
 		}
@@ -76,7 +114,7 @@ func ExportTasks(gdb *gorm.DB) fiber.Handler {
 			q = q.Where("project_id IN (?)", visible)
 		}
 		var tasks []models.Task
-		if err := applyTaskListFilters(q, gdb, f).Order("created_at, number").Find(&tasks).Error; err != nil {
+		if err := applyDateRange(applyTaskListFilters(q, gdb, f), from, to).Order("created_at, number").Find(&tasks).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not export tasks")
 		}
 		buf, err := tasksCSV(gdb, tasks)
@@ -164,10 +202,14 @@ func ClientExportTickets(gdb *gorm.DB) fiber.Handler {
 		if msg != "" {
 			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", msg)
 		}
+		from, to, msg := parseDateRange(c)
+		if msg != "" {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", msg)
+		}
 		var tasks []models.Task
-		if err := applyClientTicketFilters(
+		if err := applyDateRange(applyClientTicketFilters(
 			gdb.Model(&models.Task{}).Where("created_by = ? AND project_id IN ?", u.ID, ids), f,
-		).Order("updated_at DESC").Find(&tasks).Error; err != nil {
+		), from, to).Order("updated_at DESC").Find(&tasks).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not export tickets")
 		}
 		// project keys for the rows (same batching as ClientListTickets)

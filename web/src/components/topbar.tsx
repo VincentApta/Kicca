@@ -1,5 +1,5 @@
 import {
-  DownloadIcon, ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareCheckIcon,
+  ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareCheckIcon,
   SquareKanbanIcon, SunIcon, Trash2Icon, UserIcon, XIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import type { Label, ProjectMember, Status, User } from '@/lib/types'
 import type { View } from './sidebar'
 import { NotificationBell } from './notifications'
+import { ExportRangeButton } from './export-range'
 
 function FilterSelect({
   label,
@@ -109,7 +110,7 @@ export function Topbar({
   onBulkStatus?: (s: Status) => void
   onBulkAssign?: (id: string | null) => void
   onBulkDelete?: () => void
-  onExport: () => void
+  onExport: (range?: { from?: string; to?: string }) => void
 }) {
   const showBoardControls = view === 'board' || view === 'list' || view === 'trash'
   const inProjectView = showBoardControls || view === 'settings' || view === 'analytics'
@@ -273,15 +274,9 @@ export function Topbar({
 
       <div className="ml-auto flex items-center gap-2">
         {showBoardControls && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onExport}
-            aria-label="Export the current task list as CSV"
-          >
-            <DownloadIcon strokeWidth={1.5} />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
+          <ExportRangeButton
+            onExport={(range) => onExport(range)}
+          />
         )}
         <NotificationBell
           onOpenTask={onOpenNotification}
