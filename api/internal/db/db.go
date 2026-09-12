@@ -80,3 +80,34 @@ func SeedAdmin(gdb *gorm.DB, email, password string) error {
 	log.Printf("seed: created admin %s", admin.Email)
 	return nil
 }
+
+// SeedClient creates an optional dev client from CLIENT_EMAIL/CLIENT_PASSWORD
+// iff that email does not exist yet. Never overwrites — password resets go
+// through admin PATCH. ponytail: drop when real client onboarding exists.
+func SeedClient(gdb *gorm.DB, email, password string) error {
+	if email == "" || password == "" {
+		return nil
+	}
+	var n int64
+	if err := gdb.Model(&models.User{}).Where("email = ?", strings.ToLower(email)).Count(&n).Error; err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	c := &models.User{
+		Email:        strings.ToLower(email),
+		PasswordHash: string(hash),
+		Name:         strings.SplitN(email, "@", 2)[0],
+		GlobalRole:   "client",
+	}
+	if err := gdb.Create(c).Error; err != nil {
+		return fmt.Errorf("seed client: %w", err)
+	}
+	log.Printf("seed: created client %s", c.Email)
+	return nil
+}

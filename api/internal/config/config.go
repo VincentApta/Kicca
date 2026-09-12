@@ -18,6 +18,8 @@ type Config struct {
 	JWTSecret      string // HS256 signing secret
 	AdminEmail     string // first-boot seed admin
 	AdminPassword  string // first-boot seed admin
+	ClientEmail    string // optional dev client seed (create-only)
+	ClientPassword string // optional dev client seed (create-only)
 	GHEncKey       string // 32-byte base64 AES-256-GCM key for GitHub PATs at rest
 	GitHubAPIBase  string // default https://api.github.com, overridable for tests
 }
@@ -31,6 +33,8 @@ func Load() (*Config, error) {
 		JWTSecret:     os.Getenv("JWT_SECRET"),
 		AdminEmail:    os.Getenv("ADMIN_EMAIL"),
 		AdminPassword: os.Getenv("ADMIN_PASSWORD"),
+		ClientEmail:    os.Getenv("CLIENT_EMAIL"),
+		ClientPassword: os.Getenv("CLIENT_PASSWORD"),
 		GHEncKey:      os.Getenv("GH_ENC_KEY"),
 		GitHubAPIBase: envOr("GITHUB_API_BASE", "https://api.github.com"),
 	}

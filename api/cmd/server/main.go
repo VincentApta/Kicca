@@ -25,6 +25,9 @@ func main() {
 	if err := db.SeedAdmin(gdb, cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		log.Fatalf("seed: %v", err)
 	}
+	if err := db.SeedClient(gdb, cfg.ClientEmail, cfg.ClientPassword); err != nil {
+		log.Fatalf("seed client: %v", err)
+	}
 
 	// validation already happened in config.Load; this just decodes the bytes
 	ghEncKey, _ := github.ParseEncKey(cfg.GHEncKey)
