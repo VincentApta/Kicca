@@ -25,13 +25,40 @@ var projectKeyRe = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)
 type projectJSON struct {
 	ID          string `json:"id"`
 	TeamID      string `json:"team_id"`
+	TeamName    string `json:"team_name,omitempty"`
 	Name        string `json:"name"`
 	Key         string `json:"key"`
 	Description string `json:"description"`
 }
 
-func toProjectJSON(p *models.Project) projectJSON {
-	return projectJSON{ID: p.ID, TeamID: p.TeamID, Name: p.Name, Key: p.Key, Description: p.Description}
+// toProjectJSON fills TeamName when the caller has it (list/detail do one
+// batched lookup); empty otherwise. ponytail: team rename mid-session keeps
+// serving the stale name until refetch — fine at this scale.
+func toProjectJSON(p *models.Project, teamName string) projectJSON {
+	return projectJSON{ID: p.ID, TeamID: p.TeamID, TeamName: teamName, Name: p.Name, Key: p.Key, Description: p.Description}
+}
+
+// teamNamesFor batched team-name lookup for a page of projects.
+func teamNamesFor(gdb *gorm.DB, projects []models.Project) map[string]string {
+	if len(projects) == 0 {
+		return map[string]string{}
+	}
+	ids := make(map[string]bool, len(projects))
+	list := make([]string, 0, len(projects))
+	for i := range projects {
+		if !ids[projects[i].TeamID] {
+			ids[projects[i].TeamID] = true
+			list = append(list, projects[i].TeamID)
+		}
+	}
+	var teams []models.Team
+	names := map[string]string{}
+	if err := gdb.Select("id, name").Where("id IN ?", list).Find(&teams).Error; err == nil {
+		for i := range teams {
+			names[teams[i].ID] = teams[i].Name
+		}
+	}
+	return names
 }
 
 type projectMemberJSON struct {
@@ -109,9 +136,10 @@ func ListProjects(gdb *gorm.DB) fiber.Handler {
 		if err := scope().Order("key").Limit(perPage).Offset((page - 1) * perPage).Find(&projects).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list projects")
 		}
+		names := teamNamesFor(gdb, projects)
 		data := make([]projectJSON, len(projects))
 		for i := range projects {
-			data[i] = toProjectJSON(&projects[i])
+			data[i] = toProjectJSON(&projects[i], names[projects[i].TeamID])
 		}
 		return c.JSON(fiber.Map{"data": data, "page": page, "per_page": perPage, "total": total})
 	}
@@ -162,7 +190,7 @@ func CreateProject(gdb *gorm.DB) fiber.Handler {
 			}
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create project")
 		}
-		return c.Status(fiber.StatusCreated).JSON(toProjectJSON(p))
+		return c.Status(fiber.StatusCreated).JSON(toProjectJSON(p, team.Name))
 	}
 }
 
@@ -249,7 +277,12 @@ func PatchProject(gdb *gorm.DB) fiber.Handler {
 				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not reload project")
 			}
 		}
-		return c.JSON(toProjectJSON(p))
+		var team models.Team
+		teamName := ""
+		if err := gdb.Select("name").First(&team, "id = ?", p.TeamID).Error; err == nil {
+			teamName = team.Name
+		}
+		return c.JSON(toProjectJSON(p, teamName))
 	}
 }
 

@@ -335,5 +335,13 @@ func validateUserIDs(gdb *gorm.DB, ids []string) string {
 	if count != int64(len(ids)) {
 		return "user ids must reference existing users"
 	}
+	// clients never sit on team surfaces (assignee, team/project member rows)
+	var clients int64
+	if err := gdb.Model(&models.User{}).Where("id IN ? AND global_role = 'client'", ids).Count(&clients).Error; err != nil {
+		return "could not validate user ids"
+	}
+	if clients > 0 {
+		return "clients cannot be team or project members"
+	}
 	return ""
 }

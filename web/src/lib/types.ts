@@ -42,6 +42,7 @@ export type UserPatch = Partial<{
 export type Project = {
   id: string
   team_id: string
+  team_name?: string
   name: string
   key: string
   description: string

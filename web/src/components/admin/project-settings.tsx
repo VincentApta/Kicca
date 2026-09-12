@@ -365,6 +365,17 @@ function GeneralTab({
           Only a global admin can edit project details.
         </p>
       )}
+      <Field label="Team" htmlFor="project-team">
+        <Input
+          id="project-team"
+          className="inset-neu"
+          value={detail.team_name ?? '—'}
+          disabled
+        />
+      </Field>
+      <p className="-mt-2 text-xs text-muted-foreground">
+        Owning team is chosen at creation and cannot be moved.
+      </p>
       <Field label="Name" htmlFor="project-name" error={errors.name}>
         <Input
           id="project-name"
@@ -469,7 +480,12 @@ function MembersTab({ detail, onRefresh }: { detail: ProjectDetail; onRefresh: (
 
   useEffect(() => {
     if (canAdd && candidates === null) {
-      loadAllUsers().then(setCandidates, () => setCandidates([]))
+      // project members are team users only — clients never sit on a project
+      // team surface (their access is the client portal via project links)
+      loadAllUsers().then(
+        (users) => setCandidates(users.filter((u) => u.global_role !== 'client')),
+        () => setCandidates([]),
+      )
     }
   }, [canAdd, candidates])
 
