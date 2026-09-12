@@ -125,6 +125,8 @@ export const api = {
     req<void>(`/projects/${id}`, { method: 'DELETE' }),
   saveProjectGithub: (id: string, body: { repo: string; token?: string }) =>
     req<{ repo: string }>(`/projects/${id}/github`, { method: 'PUT', body }),
+  patchProjectTeams: (id: string, teamIds: string[]) =>
+    req<{ data: { id: string; name: string }[] }>(`/projects/${id}/teams`, { method: 'PATCH', body: { team_ids: teamIds } }),
   replaceProjectMembers: (
     id: string,
     members: { user_id: string; role: ProjectRole }[],

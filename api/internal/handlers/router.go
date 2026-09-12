@@ -67,6 +67,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	projects.Patch("/:id", PatchProject(gdb))
 	projects.Delete("/:id", DeleteProject(gdb))
 	projects.Put("/:id/members", ReplaceProjectMembers(gdb))
+	projects.Patch("/:id/teams", PatchProjectTeams(gdb))
 	projects.Get("/:id/tasks", ListTasks(gdb))
 	projects.Post("/:id/tasks", CreateTask(gdb))
 	projects.Get("/:id/labels", ListLabels(gdb))

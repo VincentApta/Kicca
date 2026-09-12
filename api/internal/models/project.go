@@ -35,3 +35,13 @@ type ProjectMember struct {
 	UserID    string `gorm:"primaryKey;type:uuid"`
 	Role      string `gorm:"not null;default:member"` // project_admin | member
 }
+
+// ProjectTeam: contributing team on a project (many-to-many). The owning
+// team (projects.team_id) is always present in this table too — the list is
+// the complete set of teams on the project.
+type ProjectTeam struct {
+	ProjectID string `gorm:"primaryKey;type:uuid"`
+	TeamID    string `gorm:"primaryKey;type:uuid"`
+}
+
+func (ProjectTeam) TableName() string { return "project_teams" }

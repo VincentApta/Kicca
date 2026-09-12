@@ -69,10 +69,11 @@ type projectMemberJSON struct {
 }
 
 type createProjectReq struct {
-	TeamID      string  `json:"team_id"`
-	Name        string  `json:"name"`
-	Key         string  `json:"key"`
-	Description *string `json:"description"`
+	TeamID      string   `json:"team_id"`
+	TeamIDs     []string `json:"team_ids"`
+	Name        string   `json:"name"`
+	Key         string   `json:"key"`
+	Description *string  `json:"description"`
 }
 
 type patchProjectReq struct {
@@ -172,14 +173,49 @@ func CreateProject(gdb *gorm.DB) fiber.Handler {
 		if err := gdb.First(&team, "id = ?", req.TeamID).Error; err != nil {
 			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "team_id must reference an existing team")
 		}
+		// contributing teams: team_ids if given, else just the owner
+		teamIDs := req.TeamIDs
+		if len(teamIDs) == 0 {
+			teamIDs = []string{req.TeamID}
+		}
+		seen := map[string]bool{}
+		uniq := make([]string, 0, len(teamIDs))
+		owns := false
+		for _, id := range teamIDs {
+			if id == "" || seen[id] {
+				continue
+			}
+			if _, err := uuid.Parse(id); err != nil {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "team_ids must be uuids")
+			}
+			seen[id] = true
+			uniq = append(uniq, id)
+			if id == req.TeamID {
+				owns = true
+			}
+		}
+		if !owns {
+			uniq = append(uniq, req.TeamID) // owner always contributes
+		}
+		var cnt int64
+		if err := gdb.Model(&models.Team{}).Where("id IN ?", uniq).Count(&cnt).Error; err != nil || cnt != int64(len(uniq)) {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "team_ids must reference existing teams")
+		}
 		p := &models.Project{TeamID: req.TeamID, Name: req.Name, Key: req.Key}
 		if req.Description != nil {
 			p.Description = *req.Description
 		}
 		// Same transaction: creator becomes project_admin (domain rule) so
-		// fresh projects have members populated.
+		// fresh projects have members populated. Contributing teams seeded.
 		err := gdb.Transaction(func(tx *gorm.DB) error {
 			if err := tx.Create(p).Error; err != nil {
+				return err
+			}
+			rows := make([]models.ProjectTeam, len(uniq))
+			for i, id := range uniq {
+				rows[i] = models.ProjectTeam{ProjectID: p.ID, TeamID: id}
+			}
+			if err := tx.Create(&rows).Error; err != nil {
 				return err
 			}
 			return tx.Create(&models.ProjectMember{ProjectID: p.ID, UserID: u.ID, Role: roleProjectAdmin}).Error
@@ -192,6 +228,27 @@ func CreateProject(gdb *gorm.DB) fiber.Handler {
 		}
 		return c.Status(fiber.StatusCreated).JSON(toProjectJSON(p, team.Name))
 	}
+}
+
+// teamsForProjects returns contributing teams [{id,name}] per project id.
+func teamsForProjects(gdb *gorm.DB, projectID string) []map[string]string {
+	var rows []struct {
+		ProjectID string
+		TeamID    string
+		Name      string
+	}
+	if err := gdb.Table("project_teams").
+		Select("project_teams.project_id, project_teams.team_id, teams.name").
+		Joins("JOIN teams ON teams.id = project_teams.team_id").
+		Where("project_teams.project_id = ?", projectID).
+		Order("teams.name").Scan(&rows).Error; err != nil {
+		return []map[string]string{}
+	}
+	out := make([]map[string]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, map[string]string{"id": r.TeamID, "name": r.Name})
+	}
+	return out
 }
 
 // GetProject: GET /api/projects/:id — detail + my_role + members. 404 for
@@ -212,8 +269,15 @@ func GetProject(gdb *gorm.DB) fiber.Handler {
 		if err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list members")
 		}
+		var owner models.Team
+		teamName := ""
+		if err := gdb.Select("name").First(&owner, "id = ?", p.TeamID).Error; err == nil {
+			teamName = owner.Name
+		}
 		return c.JSON(fiber.Map{
-			"id": p.ID, "team_id": p.TeamID, "name": p.Name, "key": p.Key,
+			"id": p.ID, "team_id": p.TeamID, "team_name": teamName,
+			"teams": teamsForProjects(gdb, p.ID),
+			"name":  p.Name, "key": p.Key,
 			"description": p.Description, "my_role": myRole, "members": members,
 			"gh_repo": p.GhRepo, // repo is not secret; the token never leaves the db
 		})
@@ -356,5 +420,68 @@ func ReplaceProjectMembers(gdb *gorm.DB) fiber.Handler {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not list members")
 		}
 		return c.JSON(fiber.Map{"members": members})
+	}
+}
+
+// PatchProjectTeams: PATCH /api/projects/:id/teams — replace the set of
+// contributing teams (global admin or project_admin). team_ids must be
+// uuids referencing existing teams and non-empty; the owning team
+// (projects.team_id) is always kept in the set (removal attempts 422).
+func PatchProjectTeams(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		p, pm, ok := loadVisibleProject(c, gdb, u, c.Params("id"))
+		if !ok {
+			return nil
+		}
+		if u.GlobalRole != roleAdmin && (pm == nil || pm.Role != roleProjectAdmin) {
+			return httpErr(c, fiber.StatusForbidden, "forbidden", "project admin role required")
+		}
+		var req struct {
+			TeamIDs []string `json:"team_ids"`
+		}
+		if err := c.BodyParser(&req); err != nil {
+			return httpErr(c, fiber.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		}
+		seen := map[string]bool{}
+		uniq := make([]string, 0, len(req.TeamIDs))
+		owns := false
+		for _, id := range req.TeamIDs {
+			if id == "" || seen[id] {
+				continue
+			}
+			if _, err := uuid.Parse(id); err != nil {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "team_ids must be uuids")
+			}
+			seen[id] = true
+			uniq = append(uniq, id)
+			if id == p.TeamID {
+				owns = true
+			}
+		}
+		if len(uniq) == 0 {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "team_ids must not be empty")
+		}
+		if !owns {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "the owning team must stay in the set")
+		}
+		var cnt int64
+		if err := gdb.Model(&models.Team{}).Where("id IN ?", uniq).Count(&cnt).Error; err != nil || cnt != int64(len(uniq)) {
+			return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "team_ids must reference existing teams")
+		}
+		err := gdb.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Where("project_id = ?", p.ID).Delete(&models.ProjectTeam{}).Error; err != nil {
+				return err
+			}
+			rows := make([]models.ProjectTeam, len(uniq))
+			for i, id := range uniq {
+				rows[i] = models.ProjectTeam{ProjectID: p.ID, TeamID: id}
+			}
+			return tx.Create(&rows).Error
+		})
+		if err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not update teams")
+		}
+		return c.JSON(fiber.Map{"data": teamsForProjects(gdb, p.ID)})
 	}
 }

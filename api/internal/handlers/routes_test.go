@@ -36,7 +36,7 @@ func newTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	if err != nil {
 		t.Fatalf("sqlite open: %v", err)
 	}
-	if err := gdb.AutoMigrate(&models.User{}, &models.Team{}, &models.TeamMember{}, &models.Project{}, &models.ProjectMember{},
+	if err := gdb.AutoMigrate(&models.User{}, &models.Team{}, &models.TeamMember{}, &models.Project{}, &models.ProjectTeam{}, &models.ProjectMember{},
 		&models.Task{}, &models.Label{}, &models.TaskLabel{}, &models.Comment{}, &models.GitHubIssueLink{},
 		&models.TaskEvent{}, &models.ClientProject{}, &models.TaskAttachment{}, &NotificationRead{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
@@ -651,5 +651,57 @@ func TestSearch(t *testing.T) {
 	client := loginAndGet(t, app, cEmail, cPass)
 	if status, _, _ := do(t, app, http.MethodGet, "/api/search?q=needl", "", client); status != http.StatusForbidden {
 		t.Fatalf("client search: got %d, want 403", status)
+	}
+}
+
+// TestProjectTeams: create with team_ids seeds contributing teams; PATCH
+// /:id/teams replaces the set; owner removal 422; detail returns teams.
+func TestProjectTeams(t *testing.T) {
+	app, _ := newTestApp(t)
+	admin := loginAndGet(t, app, adminEmail, adminPass)
+
+	_, t1, _ := do(t, app, http.MethodPost, "/api/teams", `{"name":"Team One"}`, admin)
+	_, t2, _ := do(t, app, http.MethodPost, "/api/teams", `{"name":"Team Two"}`, admin)
+	t1ID, _ := t1["id"].(string)
+	t2ID, _ := t2["id"].(string)
+
+	// create with two contributing teams
+	status, body, _ := do(t, app, http.MethodPost, "/api/projects",
+		`{"team_id":"`+t1ID+`","team_ids":["`+t1ID+`","`+t2ID+`"],"name":"Multi","key":"MULTI"}`, admin)
+	if status != http.StatusCreated {
+		t.Fatalf("create: got %d %v", status, body)
+	}
+	pid, _ := body["id"].(string)
+
+	// detail carries team_name + teams
+	_, detail, _ := do(t, app, http.MethodGet, "/api/projects/"+pid, "", admin)
+	if detail["team_name"] != "Team One" {
+		t.Fatalf("team_name: got %v", detail["team_name"])
+	}
+	teams, _ := detail["teams"].([]interface{})
+	if len(teams) != 2 {
+		t.Fatalf("teams: got %d, want 2", len(teams))
+	}
+
+	// PATCH: drop team two
+	status, body, _ = do(t, app, http.MethodPatch, "/api/projects/"+pid+"/teams",
+		`{"team_ids":["`+t1ID+`"]}`, admin)
+	if status != http.StatusOK {
+		t.Fatalf("patch teams: got %d %v", status, body)
+	}
+	teams, _ = body["data"].([]interface{})
+	if len(teams) != 1 {
+		t.Fatalf("after patch: got %d teams, want 1", len(teams))
+	}
+
+	// removing the owner 422
+	if status, _, _ := do(t, app, http.MethodPatch, "/api/projects/"+pid+"/teams",
+		`{"team_ids":["`+t2ID+`"]}`, admin); status != http.StatusUnprocessableEntity {
+		t.Fatalf("owner removal: got %d, want 422", status)
+	}
+	// empty 422
+	if status, _, _ := do(t, app, http.MethodPatch, "/api/projects/"+pid+"/teams",
+		`{"team_ids":[]}`, admin); status != http.StatusUnprocessableEntity {
+		t.Fatalf("empty: got %d, want 422", status)
 	}
 }

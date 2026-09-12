@@ -316,15 +316,28 @@ function GeneralTab({
   const [description, setDescription] = useState('')
   const [errors, setErrors] = useState<FieldErrors>({})
   const [busy, setBusy] = useState(false)
+  const [allTeams, setAllTeams] = useState<Team[] | null>(null)
+  const [teamIds, setTeamIds] = useState<string[]>([])
 
   useEffect(() => {
     if (detail) {
       setName(detail.name)
       setKey(detail.key)
       setDescription(detail.description)
+      setTeamIds((detail.teams ?? []).map((t) => t.id))
       setErrors({})
     }
   }, [detail])
+
+  useEffect(() => {
+    if (allTeams === null) {
+      api.listTeams().then((r) => setAllTeams(r.data)).catch(() => setAllTeams([]))
+    }
+  }, [allTeams])
+
+  function toggleTeam(id: string) {
+    setTeamIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
+  }
 
   // PATCH /projects/:id is global-admin-only server-side; project admins
   // get read-only fields instead of a form that 403s on save.
@@ -343,11 +356,18 @@ function GeneralTab({
         key: key.trim(),
         description: description.trim()
       })
+      // contributing teams — only when changed (owner always stays server-side)
+      const current = (detail.teams ?? []).map((t) => t.id).sort().join(',')
+      if (teamIds.slice().sort().join(',') !== current && teamIds.length > 0) {
+        await api.patchProjectTeams(detail.id, teamIds)
+      }
       toast('Project updated')
       onRefresh()
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setErrors({ key: 'A project with this key already exists.' })
+      } else if (err instanceof ApiError && err.status === 422) {
+        setErrors({ form: err.message })
       } else {
         setErrors({ form: 'Could not update project.' })
       }
@@ -365,16 +385,32 @@ function GeneralTab({
           Only a global admin can edit project details.
         </p>
       )}
-      <Field label="Team" htmlFor="project-team">
-        <Input
-          id="project-team"
-          className="inset-neu"
-          value={detail.team_name ?? '—'}
-          disabled
-        />
+      <Field label="Teams" htmlFor="project-teams">
+        <div className="flex flex-wrap gap-2">
+          {(allTeams ?? []).map((t) => {
+            const on = teamIds.includes(t.id)
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={on}
+                disabled={!editable}
+                onClick={() => toggleTeam(t.id)}
+                className={`rounded-lg border px-2.5 py-1 text-sm transition-colors ${
+                  on
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border text-muted-foreground hover:text-foreground'
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                {on ? '✓ ' : ''}{t.name}
+              </button>
+            )
+          })}
+          {allTeams === null && <span className="text-sm text-muted-foreground">Loading teams…</span>}
+        </div>
       </Field>
       <p className="-mt-2 text-xs text-muted-foreground">
-        Owning team is chosen at creation and cannot be moved.
+        Teams contributing to this project. The owning team (chosen at creation) always stays in the set.
       </p>
       <Field label="Name" htmlFor="project-name" error={errors.name}>
         <Input
