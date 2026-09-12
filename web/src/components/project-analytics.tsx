@@ -127,7 +127,7 @@ export function ProjectAnalyticsPage({
         <section className="card-neu" aria-label="Cumulative flow diagram">
           <h2 className="mb-4 text-sm font-medium text-foreground">
             Cumulative flow — {days}d
-            <span className="ml-2 inline-flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="ml-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-in-progress" />created</span>
               <span className="flex items-center gap-1"><span className="inline-block size-2 rounded-full bg-status-done" />done</span>
             </span>
@@ -193,7 +193,7 @@ export function ProjectAnalyticsPage({
                   >
                     <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[t.status]}`} />
                     <span className="flex-1 truncate text-sm text-foreground">{t.title}</span>
-                    <span className="shrink-0 font-mono text-[10px] text-status-blocked">{ageDays.toFixed(0)}d</span>
+                    <span className="shrink-0 font-mono text-xs text-status-blocked">{ageDays.toFixed(0)}d</span>
                   </button>
                 </li>
               ))}

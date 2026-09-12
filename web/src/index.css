@@ -1,17 +1,18 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource/outfit/600.css";
-@import "@fontsource/inter-tight/400.css";
-@import "@fontsource/inter-tight/500.css";
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
+@import "@fontsource/roboto/600.css";
+@import "@fontsource/roboto/700.css";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "@fontsource/jetbrains-mono/500.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: 'Outfit', var(--font-sans);
-    --font-sans: 'Inter Tight', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: 'Roboto', var(--font-sans);
+    --font-sans: 'Roboto', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -250,5 +251,8 @@
     }
   html {
     @apply font-sans;
+    /* base 17px — most text was 12–13px and read too small; one bump here
+       scales every rem-based size app-wide (text-sm 14→14.9px etc.) */
+    font-size: 17px;
     }
 }

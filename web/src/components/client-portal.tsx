@@ -426,7 +426,7 @@ export function ClientPortal() {
                       {t.project_key}-{t.number}
                     </span>
                     <StatusChip status={t.status} />
-                    <span className="ml-auto font-mono text-[10px] text-muted-foreground/60">
+                    <span className="ml-auto font-mono text-xs text-muted-foreground/60">
                       {fmtDate(t.updated_at)}
                     </span>
                   </div>
@@ -512,7 +512,7 @@ export function ClientPortal() {
                       <div key={c.id} className="inset-neu rounded-lg p-3">
                         <p className="flex items-baseline gap-2">
                           <span className="text-xs font-medium text-foreground">{c.user.name}</span>
-                          <span className="font-mono text-[10px] text-muted-foreground/60">
+                          <span className="font-mono text-xs text-muted-foreground/60">
                             {fmtDate(c.created_at)}
                           </span>
                         </p>

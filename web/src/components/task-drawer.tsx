@@ -330,7 +330,7 @@ function DrawerBody({
               </button>
             )}
           </div>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Triage conclusion — used as the GitHub issue body (description kept as context) when creating an issue.
           </p>
           {editingAssess ? (

@@ -70,7 +70,7 @@ export function SearchDropdown({
         <>
           {res.projects.length > 0 && (
             <>
-              <p className="border-b border-border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="border-b border-border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Projects
               </p>
               <ul>
@@ -81,7 +81,7 @@ export function SearchDropdown({
                       onClick={() => { setOpen(false); onOpenProject(p.id) }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent"
                     >
-                      <span className="font-mono text-[10px] uppercase text-muted-foreground">{p.key}</span>
+                      <span className="font-mono text-xs uppercase text-muted-foreground">{p.key}</span>
                       <span className="truncate text-foreground">{p.name}</span>
                     </button>
                   </li>
@@ -91,7 +91,7 @@ export function SearchDropdown({
           )}
           {res.tasks.length > 0 && (
             <>
-              <p className="border-b border-border px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="border-b border-border px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Tasks
               </p>
               <ul>
@@ -102,7 +102,7 @@ export function SearchDropdown({
                       onClick={() => { setOpen(false); onOpenTask(t.id, t.project_id) }}
                       className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-accent"
                     >
-                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
                         {t.project_key}#{t.number}
                       </span>
                       <span className="truncate text-foreground">{t.title}</span>

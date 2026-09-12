@@ -99,7 +99,7 @@ export function NotificationBell({
       >
         <BellIcon strokeWidth={1.5} />
         {n > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white">
             {n > 9 ? '9+' : n}
           </span>
         )}
@@ -129,11 +129,11 @@ export function NotificationBell({
                         <span className="font-medium">{it.actor_name}</span>{' '}
                         <span className="text-muted-foreground">{EVENT_LABELS[it.type] ?? it.type}</span>
                       </p>
-                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {it.project_key}#{it.task_number} — {it.task_title}
                       </p>
                     </div>
-                    <span className="mt-0.5 shrink-0 text-[10px] text-muted-foreground">{relTime(it.at)}</span>
+                    <span className="mt-0.5 shrink-0 text-xs text-muted-foreground">{relTime(it.at)}</span>
                   </button>
                 </li>
               ))}

@@ -252,17 +252,17 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
                     className="inset-neu flex w-full flex-col gap-2 px-4 py-3 text-left transition-shadow hover:shadow-[var(--shadow-inset),var(--shadow-glow)]"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] uppercase text-muted-foreground">
+                      <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-xs uppercase text-muted-foreground">
                         {p?.key ?? '?'}
                       </span>
                       <span className="flex-1 truncate text-sm font-medium text-foreground">
                         {p?.name ?? 'Unknown project'}
                       </span>
-                      <span className={`shrink-0 text-[10px] font-medium tracking-wide uppercase ${HEALTH_BADGE[s.health]}`}>
+                      <span className={`shrink-0 text-xs font-medium tracking-wide uppercase ${HEALTH_BADGE[s.health]}`}>
                         {HEALTH_LABEL[s.health]}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       {s.mainStatus ? (
                         <span className="flex items-center gap-1.5">
                           <span className={`size-2 rounded-full ${STATUS_DOT[s.mainStatus]}`} />
@@ -328,11 +328,11 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
                   <li key={m.id}>
                     <button onClick={() => setMemberId(m.id)}
                       className="inset-neu flex w-full items-center gap-3 px-3 py-2 text-left transition-shadow hover:shadow-[var(--shadow-inset),var(--shadow-glow)]">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-[10px] text-muted-foreground">
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary font-mono text-xs text-muted-foreground">
                         {initials(m.name)}
                       </span>
                       <span className="flex-1 truncate text-sm text-foreground">{m.name}</span>
-                      {mod > 0 && <span className="font-mono text-[10px] text-status-blocked">{mod} overdue</span>}
+                      {mod > 0 && <span className="font-mono text-xs text-status-blocked">{mod} overdue</span>}
                       <span className="font-mono text-xs text-muted-foreground">{mo.length} open</span>
                     </button>
                   </li>
@@ -354,8 +354,8 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
                     className="inset-neu flex w-full items-center gap-3 px-3 py-2 text-left transition-shadow hover:shadow-[var(--shadow-inset),var(--shadow-glow)]">
                     <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[t.status]}`} />
                     <span className="flex-1 truncate text-sm text-foreground">{t.title}</span>
-                    <span className="shrink-0 font-mono text-[10px] text-status-blocked">{ageDays.toFixed(0)}d</span>
-                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground uppercase">{t.project_key}</span>
+                    <span className="shrink-0 font-mono text-xs text-status-blocked">{ageDays.toFixed(0)}d</span>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground uppercase">{t.project_key}</span>
                   </button>
                 </li>
               ))}
@@ -378,9 +378,9 @@ export function DashboardPage({ onSelectTask }: { onSelectTask: (projectId: stri
                     <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[t.status]}`} />
                     <span className="flex-1 truncate text-sm text-foreground">{t.title}</span>
                     {t.assignee && <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">{t.assignee.name}</span>}
-                    <span className="shrink-0 font-mono text-[10px] text-muted-foreground uppercase">{t.project_key}</span>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground uppercase">{t.project_key}</span>
                     {t.due_date && (
-                      <span className={`shrink-0 font-mono text-[10px] ${t.due_date < today ? 'text-status-blocked' : 'text-muted-foreground'}`}>
+                      <span className={`shrink-0 font-mono text-xs ${t.due_date < today ? 'text-status-blocked' : 'text-muted-foreground'}`}>
                         {t.due_date}
                       </span>
                     )}

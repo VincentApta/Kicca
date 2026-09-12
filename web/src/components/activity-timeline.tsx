@@ -41,7 +41,7 @@ export function ActivityTimeline({ events }: { events: TaskActivityEvent[] }) {
             <span className="text-xs font-medium text-foreground">{actorName(e.actor)}</span>
             <span className="text-xs text-muted-foreground">{statusChange(e)}</span>
             <span
-              className="font-mono text-[10px] text-muted-foreground/60"
+              className="font-mono text-xs text-muted-foreground/60"
               title={new Date(e.at).toLocaleString()}
             >
               {relativeTime(e.at)}

@@ -90,7 +90,7 @@ export default function MyTasksPage({ onSelectTask }: Props) {
               {/* project key mono chip */}
               {task.project_key && (
                 <span className="shrink-0 mt-0.5 inline-flex items-center rounded-md bg-secondary/60
-                                 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                 px-1.5 py-0.5 font-mono text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {task.project_key}
                 </span>
               )}
@@ -116,7 +116,7 @@ export default function MyTasksPage({ onSelectTask }: Props) {
 
               {/* due date */}
               {task.due_date && (
-                <span className="shrink-0 text-[10px] text-muted-foreground/50 font-mono mt-0.5">
+                <span className="shrink-0 text-xs text-muted-foreground/50 font-mono mt-0.5">
                   {task.due_date}
                 </span>
               )}
