@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { DownloadIcon, LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
 import { ActivityTimeline } from '@/components/activity-timeline'
+import { NotificationBell } from '@/components/notifications'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -231,6 +232,15 @@ export function ClientPortal() {
             <DownloadIcon strokeWidth={1.5} />
             <span className="hidden sm:inline">Export</span>
           </Button>
+          <NotificationBell
+            onOpenTask={(taskId: string) => {
+              // refetch list (may be filtered), find the ticket, open detail
+              api.clientListTickets({ q: '', project_id: '', status: undefined }).then(({ data }) => {
+                const t = data.find((x) => x.id === taskId)
+                if (t) setDetail(t)
+              }).catch(() => { /* swallow */ })
+            }}
+          />
           <Button
             variant="ghost"
             size="sm"

@@ -1,0 +1,2 @@
+ALTER TABLE task_events DROP COLUMN IF EXISTS comment_id;
+ALTER TABLE task_events DROP COLUMN IF EXISTS type;

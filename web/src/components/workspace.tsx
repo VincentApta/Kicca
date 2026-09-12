@@ -342,6 +342,13 @@ export function Workspace() {
     }
   }
 
+  // notification bell → open the task's drawer (navigate to the project first)
+  function openTaskFromNotification(taskId: string, projectId: string) {
+    setCurrentProjectId(projectId)
+    setView('board')
+    setTimeout(() => setDrawerId(taskId), 50)
+  }
+
   if (projects === null) return <BootSkeleton />
 
   if (projects.length === 0) {
@@ -355,7 +362,8 @@ export function Workspace() {
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
         currentProjectId={null} onSwitchProject={switchProject}
         onNavigate={setView} onMyTasks={() => setView('mytasks')} myTasksActive={false}
-        settingsAvailable={false} selectMode={false} onExport={handleExport}>
+        settingsAvailable={false} selectMode={false} onExport={handleExport}
+        onOpenNotification={openTaskFromNotification}>
         {view === 'teams' ? (
           <TeamsPage />
         ) : view === 'users' ? (
@@ -435,6 +443,7 @@ export function Workspace() {
       onBulkAssign={(id) => handleBulk({ assignee_id: id })}
       onBulkDelete={() => setConfirmBulkDelete(true)}
       onExport={handleExport}
+      onOpenNotification={openTaskFromNotification}
     >
       {view === 'overview' ? (
         <DashboardPage
@@ -665,6 +674,7 @@ type ShellProps = {
   onBulkAssign?: (id: string | null) => void
   onBulkDelete?: () => void
   onExport: () => void
+  onOpenNotification: (taskId: string, projectId: string) => void
 }
 
 function ShellFrame({ children, ...shell }: ShellProps) {
@@ -705,6 +715,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
           onBulkAssign={shell.onBulkAssign}
           onBulkDelete={shell.onBulkDelete}
           onExport={shell.onExport}
+          onOpenNotification={shell.onOpenNotification}
         />
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
       </div>

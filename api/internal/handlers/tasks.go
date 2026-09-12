@@ -711,6 +711,20 @@ func PatchTask(gdb *gorm.DB) fiber.Handler {
 					}
 				}
 			}
+			// assignment change → notification event (type=assign), only when
+			// the assignee actually changed to someone other than the actor
+			newAssignee := ""
+			if req.AssigneeID != nil && string(req.AssigneeID) != "null" {
+				_ = json.Unmarshal(req.AssigneeID, &newAssignee)
+			}
+			if newAssignee != "" && (t.AssigneeID == nil || *t.AssigneeID != newAssignee) && newAssignee != u.ID {
+				if err := tx.Create(&models.TaskEvent{
+					TaskID: t.ID, ActorID: u.ID, Type: "assign",
+					FromStatus: nil, ToStatus: t.Status,
+				}).Error; err != nil {
+					return err
+				}
+			}
 			return nil
 		})
 		if err != nil {
@@ -949,6 +963,14 @@ func CreateComment(gdb *gorm.DB) fiber.Handler {
 		cm := &models.Comment{TaskID: t.ID, UserID: u.ID, Body: req.Body}
 		if err := gdb.Create(cm).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create comment")
+		}
+		// comment event → notification feed (type=comment), relevant to the
+		// task creator/assignee. CommentID set so the feed can jump to it.
+		if err := gdb.Create(&models.TaskEvent{
+			TaskID: t.ID, ActorID: u.ID, Type: "comment",
+			FromStatus: nil, ToStatus: t.Status, CommentID: &cm.ID,
+		}).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not log comment event")
 		}
 		return c.Status(fiber.StatusCreated).JSON(toCommentJSON(cm, u.Name))
 	}

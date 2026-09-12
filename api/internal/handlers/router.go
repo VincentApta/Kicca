@@ -104,6 +104,11 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	labels.Delete("/:id", DeleteLabel(gdb))
 	labels.Patch("/:id", PatchLabel(gdb))
 
+	// notifications — team + client both
+	notif := api.Group("/notifications", middleware.RequireAuth(jwtSecret, gdb))
+	notif.Get("/", ListNotifications(gdb))
+	notif.Post("/read", MarkNotificationsRead(gdb))
+
 	// client portal — clients only (team users get 403). Static group before
 	// nothing parametric; registered last per the static-first convention.
 	client := api.Group("/client", middleware.RequireClient(jwtSecret, gdb))
