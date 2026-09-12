@@ -210,3 +210,18 @@ export type Attachment = {
   task_id?: string
   created_by?: string
 }
+
+/** Notification (bell) — one task_events row relevant to the current user. */
+export type Notification = {
+  id: string
+  type: 'status' | 'assign' | 'comment'
+  at: string
+  actor_name: string
+  task_id: string
+  task_number: number
+  task_title: string
+  project_key: string
+  project_id: string
+  from_status?: string
+  to_status: string
+}

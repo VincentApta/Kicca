@@ -38,7 +38,7 @@ func newTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	}
 	if err := gdb.AutoMigrate(&models.User{}, &models.Team{}, &models.TeamMember{}, &models.Project{}, &models.ProjectMember{},
 		&models.Task{}, &models.Label{}, &models.TaskLabel{}, &models.Comment{}, &models.GitHubIssueLink{},
-		&models.TaskEvent{}, &models.ClientProject{}, &models.TaskAttachment{}); err != nil {
+		&models.TaskEvent{}, &models.ClientProject{}, &models.TaskAttachment{}, &NotificationRead{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 	if err := db.SeedAdmin(gdb, adminEmail, adminPass); err != nil {
@@ -480,5 +480,116 @@ func TestListUsersPagination(t *testing.T) {	app, _ := newTestApp(t)
 	data, _ := body["data"].([]interface{})
 	if len(data) != 2 {
 		t.Fatalf("page data len: got %d, want 2", len(data))
+	}
+}
+
+// TestNotifications: unread feed = relevant task_events after watermark;
+// mark-read bumps it; assign + comment + status events all appear.
+func TestNotifications(t *testing.T) {
+	app, _ := newTestApp(t)
+	_, adminBody, _ := do(t, app, http.MethodPost, "/api/auth/login",
+		`{"email":"`+adminEmail+`","password":"`+adminPass+`"}`, "")
+	adminUser, _ := adminBody["user"].(map[string]interface{})
+	adminID, _ := adminUser["id"].(string)
+	admin := loginAndGet(t, app, adminEmail, adminPass)
+
+	// admin creates a team + project
+	status, team, _ := do(t, app, http.MethodPost, "/api/teams",
+		`{"name":"Notif Team"}`, admin)
+	if status != http.StatusCreated {
+		t.Fatalf("create team: got %d %v", status, team)
+	}
+	teamID, _ := team["id"].(string)
+	status, proj, _ := do(t, app, http.MethodPost, "/api/projects",
+		`{"team_id":"`+teamID+`","name":"Notif","key":"NTF"}`, admin)
+	if status != http.StatusCreated {
+		t.Fatalf("create project: got %d %v", status, proj)
+	}
+	projID, _ := proj["id"].(string)
+
+	// make a member, create a task, assign the member
+	status, created := createUserViaAPI(t, app, admin, memberEmail, memberPass, "member")
+	if status != http.StatusCreated {
+		t.Fatalf("create member: got %d %v", status, created)
+	}
+	member := loginAndGet(t, app, memberEmail, memberPass)
+	memberID, _ := created["id"].(string)
+
+	// member joins the team, then the project (whole replace keeps admin)
+	status, _, _ = do(t, app, http.MethodPut, "/api/teams/"+teamID+"/members",
+		`{"user_ids":["`+memberID+`"]}`, admin)
+	if status != http.StatusOK {
+		t.Fatalf("add member to team: got %d", status)
+	}
+	status, _, _ = do(t, app, http.MethodPut, "/api/projects/"+projID+"/members",
+		`{"members":[{"user_id":"`+adminID+`","role":"project_admin"},{"user_id":"`+memberID+`","role":"member"}]}`, admin)
+	if status != http.StatusOK {
+		t.Fatalf("add member to project: got %d", status)
+	}
+
+	status, task, _ := do(t, app, http.MethodPost, "/api/projects/"+projID+"/tasks",
+		`{"title":"notif task","priority":"medium"}`, admin)
+	if status != http.StatusCreated {
+		t.Fatalf("create task: got %d %v", status, task)
+	}
+	taskID, _ := task["id"].(string)
+
+	// assign to member → member sees an 'assign' notification, admin (creator) doesn't
+	status, _, _ = do(t, app, http.MethodPatch, "/api/tasks/"+taskID,
+		`{"assignee_id":"`+memberID+`"}`, admin)
+	if status != http.StatusOK {
+		t.Fatalf("assign: got %d", status)
+	}
+	status, body, _ := do(t, app, http.MethodGet, "/api/notifications", "", member)
+	if status != http.StatusOK {
+		t.Fatalf("member notif list: got %d", status)
+	}
+	notifs, _ := body["data"].([]interface{})
+	if len(notifs) != 1 {
+		t.Fatalf("member unread after assign: got %d, want 1", len(notifs))
+	}
+
+	// member comments → admin (creator) gets a notif; member's own comment doesn't self-notify
+	status, _, _ = do(t, app, http.MethodPost, "/api/tasks/"+taskID+"/comments",
+		`{"body":"hello"}`, member)
+	if status != http.StatusCreated {
+		t.Fatalf("member comment: got %d", status)
+	}
+	status, body, _ = do(t, app, http.MethodGet, "/api/notifications", "", admin)
+	if status != http.StatusOK {
+		t.Fatalf("admin notif list: got %d", status)
+	}
+	notifs, _ = body["data"].([]interface{})
+	if len(notifs) != 1 {
+		t.Fatalf("admin unread after comment: got %d, want 1", len(notifs))
+	}
+
+	// status change by admin → member (assignee) notified
+	status, _, _ = do(t, app, http.MethodPatch, "/api/tasks/"+taskID,
+		`{"status":"in_progress"}`, admin)
+	if status != http.StatusOK {
+		t.Fatalf("status move: got %d", status)
+	}
+	status, body, _ = do(t, app, http.MethodGet, "/api/notifications", "", member)
+	if status != http.StatusOK {
+		t.Fatalf("member notif list 2: got %d", status)
+	}
+	notifs, _ = body["data"].([]interface{})
+	if len(notifs) != 2 { // assign + status
+		t.Fatalf("member unread after status: got %d, want 2", len(notifs))
+	}
+
+	// mark-read → empty
+	status, _, _ = do(t, app, http.MethodPost, "/api/notifications/read", "", member)
+	if status != http.StatusNoContent {
+		t.Fatalf("mark read: got %d", status)
+	}
+	status, body, _ = do(t, app, http.MethodGet, "/api/notifications", "", member)
+	if status != http.StatusOK {
+		t.Fatalf("member notif list 3: got %d", status)
+	}
+	notifs, _ = body["data"].([]interface{})
+	if len(notifs) != 0 {
+		t.Fatalf("member unread after read: got %d, want 0", len(notifs))
 	}
 }

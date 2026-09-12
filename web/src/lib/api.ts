@@ -10,6 +10,7 @@ import type {
   GhLink,
   Label,
   MovePayload,
+  Notification as AppNotification,
   Paginated,
   Priority,
   Project,
@@ -139,6 +140,10 @@ export const api = {
     req<void>(`/labels/${id}`, { method: 'DELETE' }),
   patchLabel: (id: string, body: { name?: string; color?: string }) =>
     req<Label>(`/labels/${id}`, { method: 'PATCH', body }),
+
+  // Notifications (bell)
+  listNotifications: () => req<{ data: AppNotification[] }>(`/notifications`),
+  markNotificationsRead: () => req<void>(`/notifications/read`, { method: 'POST' }),
 
   // Tasks feed (global, cross-project). assigneeId optional — omit for all members.
   myFetchMyTasks: (assigneeId?: string, page = 1, perPage = 100, assigneeIds?: string[]) =>

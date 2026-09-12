@@ -45,6 +45,7 @@ function mount(props: Partial<Parameters<typeof Topbar>[0]> = {}) {
         onLogout={() => {}}
         onProfile={() => {}}
         onExport={() => {}}
+        onOpenNotification={() => {}}
         {...props}
       />,
     )

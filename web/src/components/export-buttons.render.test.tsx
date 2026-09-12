@@ -43,6 +43,7 @@ describe('Topbar export button (#50)', () => {
           onLogout={() => {}}
           onProfile={() => {}}
           onExport={onExport}
+        onOpenNotification={() => {}}
         />,
       )
     })
@@ -76,6 +77,7 @@ describe('Topbar export button (#50)', () => {
           onLogout={() => {}}
           onProfile={() => {}}
           onExport={() => {}}
+          onOpenNotification={() => {}}
         />,
       )
     })

@@ -214,6 +214,14 @@ func ClientCreateTicketComment(gdb *gorm.DB) fiber.Handler {
 		if err := gdb.Create(cm).Error; err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create comment")
 		}
+		// comment event → notification feed (type=comment), relevant to the
+		// task creator/assignee (team side).
+		if err := gdb.Create(&models.TaskEvent{
+			TaskID: t.ID, ActorID: u.ID, Type: "comment",
+			FromStatus: nil, ToStatus: "inbox", CommentID: &cm.ID,
+		}).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not log comment event")
+		}
 		return c.Status(fiber.StatusCreated).JSON(clientCommentJSON{
 			ID: cm.ID, Body: cm.Body, CreatedAt: cm.CreatedAt,
 			User: clientCommentAuthorJSON{Name: u.Name},

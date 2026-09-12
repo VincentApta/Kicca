@@ -24,6 +24,7 @@ import { BOARD_STATUSES, PRIORITY_ORDER, STATUS_LABEL, filtersActive, type TaskF
 import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import type { Label, ProjectMember, Status, User } from '@/lib/types'
 import type { View } from './sidebar'
+import { NotificationBell } from './notifications'
 
 function FilterSelect({
   label,
@@ -84,6 +85,7 @@ export function Topbar({
   onBulkAssign,
   onBulkDelete,
   onExport,
+  onOpenNotification,
 }: {
   project: { name: string; key: string } | null
   view: View
@@ -99,6 +101,7 @@ export function Topbar({
   me: User
   onProfile: () => void
   onLogout: () => void
+  onOpenNotification: (taskId: string, projectId: string) => void
   selectMode?: boolean // multi-select mode (issue #46): bulk actions replace filters
   selectedCount?: number
   onToggleSelectMode?: () => void
@@ -280,6 +283,9 @@ export function Topbar({
             <span className="hidden sm:inline">Export</span>
           </Button>
         )}
+        <NotificationBell
+          onOpenTask={onOpenNotification}
+        />
         <Button
           variant="ghost"
           size="icon-sm"

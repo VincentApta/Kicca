@@ -81,7 +81,11 @@ func (c *Comment) BeforeCreate(_ *gorm.DB) error {
 	return nil
 }
 
-// TaskEvent: one row per status transition, NULL from_status = creation.
+// TaskEvent: one row per task event — status transition (FromStatus → ToStatus,
+// NULL from = creation), assignment (type='assign', ToStatus unchecked), or
+// comment (type='comment', CommentID set). Doubles as the notification feed:
+// an event is relevant to a user who is the task creator/assignee and is not
+// the actor.
 type TaskEvent struct {
 	ID         string     `gorm:"primaryKey;type:uuid"`
 	TaskID     string     `gorm:"not null;index;type:uuid"`
@@ -89,6 +93,8 @@ type TaskEvent struct {
 	FromStatus *string
 	ToStatus   string     `gorm:"not null"`
 	At         time.Time
+	Type       string     `gorm:"not null;default:status;index"` // status | assign | comment
+	CommentID  *string    `gorm:"type:uuid"`
 }
 
 // TableName pins the SQL-migration name (same reason as GitHubIssueLink:
