@@ -36,6 +36,7 @@ func NotificationStream(gdb *gorm.DB) fiber.Handler {
 				return w.Flush() == nil
 			}
 
+			first := true
 			lastSig := ""
 			tick := time.NewTicker(10 * time.Second)
 			defer tick.Stop()
@@ -50,9 +51,10 @@ func NotificationStream(gdb *gorm.DB) fiber.Handler {
 				if len(items) > 0 {
 					sig = items[0].ID + ":" + string(rune(len(items)))
 				}
-				if sig == lastSig {
+				if sig == lastSig && !first {
 					return true // unchanged
 				}
+				first = false
 				lastSig = sig
 				buf, err := json.Marshal(items)
 				if err != nil {
