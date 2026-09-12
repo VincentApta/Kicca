@@ -1,6 +1,6 @@
 import {
-  ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareCheckIcon,
-  SquareKanbanIcon, SunIcon, Trash2Icon, XIcon,
+  DownloadIcon, ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareCheckIcon,
+  SquareKanbanIcon, SunIcon, Trash2Icon, UserIcon, XIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -74,6 +74,7 @@ export function Topbar({
   theme,
   onToggleTheme,
   me,
+  onProfile,
   onLogout,
   selectMode = false,
   selectedCount = 0,
@@ -82,6 +83,7 @@ export function Topbar({
   onBulkStatus,
   onBulkAssign,
   onBulkDelete,
+  onExport,
 }: {
   project: { name: string; key: string } | null
   view: View
@@ -95,6 +97,7 @@ export function Topbar({
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   me: User
+  onProfile: () => void
   onLogout: () => void
   selectMode?: boolean // multi-select mode (issue #46): bulk actions replace filters
   selectedCount?: number
@@ -103,6 +106,7 @@ export function Topbar({
   onBulkStatus?: (s: Status) => void
   onBulkAssign?: (id: string | null) => void
   onBulkDelete?: () => void
+  onExport: () => void
 }) {
   const showBoardControls = view === 'board' || view === 'list' || view === 'trash'
   const inProjectView = showBoardControls || view === 'settings' || view === 'analytics'
@@ -265,6 +269,17 @@ export function Topbar({
       )}
 
       <div className="ml-auto flex items-center gap-2">
+        {showBoardControls && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onExport}
+            aria-label="Export the current task list as CSV"
+          >
+            <DownloadIcon strokeWidth={1.5} />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-sm"
@@ -294,6 +309,13 @@ export function Topbar({
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            {/* self-service profile (#49) — non-admin; admins keep the Users page */}
+            {me.global_role !== 'admin' && (
+              <DropdownMenuItem onClick={onProfile}>
+                <UserIcon strokeWidth={1.5} />
+                Profile
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onLogout}>
               <LogOutIcon strokeWidth={1.5} />
               Log out

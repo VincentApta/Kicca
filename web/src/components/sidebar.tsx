@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import type { User } from '@/lib/types'
 
-export type View = 'overview' | 'projects' | 'mytasks' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings' | 'analytics'
+export type View = 'overview' | 'projects' | 'mytasks' | 'board' | 'list' | 'trash' | 'teams' | 'users' | 'settings' | 'analytics' | 'profile'
 
 function NavButton({
   label,

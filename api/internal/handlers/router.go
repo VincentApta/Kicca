@@ -34,6 +34,9 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	authG.Post("/logout", Logout)
 	authG.Get("/me", middleware.RequireAuth(jwtSecret, gdb), Me)
 
+	// self-service profile (#49): current user, non-admin only
+	api.Patch("/me", middleware.RequireAuth(jwtSecret, gdb), PatchMe(gdb))
+
 	// user management — global admin only (implies non-client)
 	users := api.Group("/users", middleware.RequireAdmin(jwtSecret, gdb))
 	users.Get("/", ListUsers(gdb))
@@ -70,13 +73,15 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	projects.Post("/:id/labels", CreateLabel(gdb))
 	projects.Put("/:id/github", PutProjectGithub(gdb, ghEncKey))
 
-	// tasks — GET / and /events must be registered BEFORE the parametric
-	// /:id route (static-before-parametric, same as /api/users above)
+	// tasks — GET /, /events and /export must be registered BEFORE the
+	// parametric /:id route (static-before-parametric, same as /api/users)
 	tasks := api.Group("/tasks", middleware.RequireTeam(jwtSecret, gdb))
 	tasks.Get("/", MyTasks(gdb))
 	tasks.Get("/events", TaskEvents(gdb))
 	tasks.Patch("/bulk", BulkPatchTasks(gdb))
+	tasks.Get("/export", ExportTasks(gdb))
 	tasks.Get("/:id", GetTask(gdb))
+	tasks.Get("/:id/events", TaskActivity(gdb))
 	tasks.Patch("/:id", PatchTask(gdb))
 	tasks.Delete("/:id", DeleteTask(gdb))
 	tasks.Post("/:id/restore", RestoreTask(gdb))
@@ -104,6 +109,10 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	client.Get("/projects", ClientListProjects(gdb))
 	client.Post("/tickets", ClientCreateTicket(gdb))
 	client.Get("/tickets", ClientListTickets(gdb))
+	client.Get("/tickets/export", ClientExportTickets(gdb)) // static before /:id
 	client.Post("/tickets/:id/attachments", ClientUploadTicketAttachment(gdb))
 	client.Get("/tickets/:id/attachments", ClientListTicketAttachments(gdb))
+	client.Get("/tickets/:id/events", ClientTicketEvents(gdb))
+	client.Get("/tickets/:id/comments", ClientListTicketComments(gdb))
+	client.Post("/tickets/:id/comments", ClientCreateTicketComment(gdb))
 }

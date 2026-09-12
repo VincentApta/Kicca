@@ -17,6 +17,7 @@ import { ListView } from './list-view'
 import { CreateTaskDialog } from './create-task-dialog'
 import { TaskDrawer } from './task-drawer'
 import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
+import { ProfilePage } from './profile-page'
 import MyTasksPage from './my-tasks-page'
 import { DashboardPage } from './dashboard-page'
 import { ProjectAnalyticsPage } from './project-analytics'
@@ -223,6 +224,19 @@ export function Workspace() {
     setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, gh_link: link } : t)))
   }
 
+  // CSV export of the current filtered view (#50) — mirrors the fetch params
+  function handleExport() {
+    if (!currentProjectId) return
+    api.exportTasks({
+      project_id: currentProjectId,
+      q: filters.q,
+      assignee_id: filters.assignee_id,
+      priority: filters.priority,
+      label: filters.label_id,
+      status: trashMode ? 'trash' : filters.status,
+    })
+  }
+
   function handleRestore(id: string) {
     api.restoreTask(id).then(
       (updated) => {
@@ -335,17 +349,19 @@ export function Workspace() {
     // working admin nav; members can only be added by an admin.
     const isAdmin = me.global_role === 'admin'
     return (
-      <ShellFrame projects={projects} me={me} theme={theme} onToggleTheme={toggle} onLogout={logout} view={view}
+      <ShellFrame projects={projects} me={me} theme={theme} onToggleTheme={toggle} onLogout={logout} onProfile={() => setView('profile')} view={view}
         onView={(v) => setView(v)} filters={filters} onFilters={setFilters} members={[]} labels={[]}
         search={search} onSearch={setSearch} project={null}
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
         currentProjectId={null} onSwitchProject={switchProject}
         onNavigate={setView} onMyTasks={() => setView('mytasks')} myTasksActive={false}
-        settingsAvailable={false} selectMode={false}>
+        settingsAvailable={false} selectMode={false} onExport={handleExport}>
         {view === 'teams' ? (
           <TeamsPage />
         ) : view === 'users' ? (
           <UsersPage />
+        ) : view === 'profile' ? (
+          <ProfilePage />
         ) : (
           <EmptyState
             title="No projects yet"
@@ -391,6 +407,7 @@ export function Workspace() {
       theme={theme}
       onToggleTheme={toggle}
       onLogout={logout}
+      onProfile={() => setView('profile')}
       view={view}
       onView={(v) => setView(v)}
       filters={filters}
@@ -417,6 +434,7 @@ export function Workspace() {
       onBulkStatus={(s) => handleBulk({ status: s })}
       onBulkAssign={(id) => handleBulk({ assignee_id: id })}
       onBulkDelete={() => setConfirmBulkDelete(true)}
+      onExport={handleExport}
     >
       {view === 'overview' ? (
         <DashboardPage
@@ -470,6 +488,8 @@ export function Workspace() {
         <TeamsPage />
       ) : view === 'users' ? (
         <UsersPage />
+      ) : view === 'profile' ? (
+        <ProfilePage />
       ) : view === 'mytasks' ? (
         <MyTasksPage
           onSelectTask={(projectId: string, taskId: string) => {
@@ -619,6 +639,7 @@ type ShellProps = {
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onLogout: () => void
+  onProfile: () => void
   view: View
   onView: (v: 'board' | 'list') => void
   filters: TaskFilters
@@ -643,6 +664,7 @@ type ShellProps = {
   onBulkStatus?: (s: Status) => void
   onBulkAssign?: (id: string | null) => void
   onBulkDelete?: () => void
+  onExport: () => void
 }
 
 function ShellFrame({ children, ...shell }: ShellProps) {
@@ -673,6 +695,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
           theme={shell.theme}
           onToggleTheme={shell.onToggleTheme}
           me={shell.me}
+          onProfile={shell.onProfile}
           onLogout={shell.onLogout}
           selectMode={shell.selectMode}
           selectedCount={shell.selectedCount}
@@ -681,6 +704,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
           onBulkStatus={shell.onBulkStatus}
           onBulkAssign={shell.onBulkAssign}
           onBulkDelete={shell.onBulkDelete}
+          onExport={shell.onExport}
         />
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
       </div>

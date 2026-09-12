@@ -9,7 +9,9 @@ import {
   SearchIcon,
   TagIcon,
   Trash2Icon,
+  UserCheckIcon,
   UserPlusIcon,
+  UserXIcon,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -158,19 +160,45 @@ const PROJECT_ROLE_LABELS: Record<string, string> = { project_admin: 'Project ad
 export function UsersPage() {
   const { state } = useAuth()
   const me = state.phase === 'authenticated' ? state.user : null
+  const toast = useToast()
 
   const [page, setPage] = useState(1)
   const [res, setRes] = useState<Paginated<User> | null>(null)
   const [error, setError] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
-  // PATCH /users/:id accepts `disabled` but the wire `user` shape never
-  // reports it back — track toggles locally for the Status column.
-  const [disabledIds, setDisabledIds] = useState<ReadonlySet<string>>(new Set())
+  const [toggling, setToggling] = useState<string | null>(null)
 
   function load(p: number) {
     setRes(null)
     api.listUsers(p).then(setRes, () => setError(true))
+  }
+
+  // Row disable/enable toggle (#45). Self and last-enabled-admin are guarded
+  // server-side (409) — surface the message instead of a generic failure.
+  function toggleDisabled(u: User) {
+    setToggling(u.id)
+    api.patchUser(u.id, { disabled: !(u.disabled === true) }).then(
+      (updated) => {
+        setToggling(null)
+        // disabled is omitempty on the wire — normalize instead of spreading
+        setRes((r) =>
+          r
+            ? {
+                ...r,
+                data: r.data.map((x) =>
+                  x.id === updated.id ? { ...x, ...updated, disabled: updated.disabled === true } : x,
+                ),
+              }
+            : r,
+        )
+        toast(updated.disabled ? `${updated.name} disabled` : `${updated.name} enabled`)
+      },
+      (err) => {
+        setToggling(null)
+        toast(err instanceof ApiError ? err.message : 'Could not update user', 'error')
+      },
+    )
   }
 
   useEffect(() => {
@@ -204,33 +232,52 @@ export function UsersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-16" aria-label="Actions" />
+                <TableHead className="w-24" aria-label="Actions" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {res.data.map((u) => {
-                const disabled = disabledIds.has(u.id)
+                const disabled = u.disabled === true
+                const isSelf = !!me && u.id === me.id
                 return (
-                  <TableRow key={u.id}>
+                  <TableRow key={u.id} className={disabled ? 'opacity-50' : undefined}>
                     <TableCell className="font-medium">{u.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{u.email}</TableCell>
                     <TableCell className="text-xs">
                       {GLOBAL_ROLE_LABELS[u.global_role] ?? u.global_role}
                     </TableCell>
                     <TableCell className="text-xs">
-                      <span className={disabled ? 'text-status-blocked' : 'text-status-done'}>
-                        {disabled ? 'Disabled' : 'Active'}
-                      </span>
+                      {disabled ? (
+                        <Badge variant="secondary">Disabled</Badge>
+                      ) : (
+                        <span className="text-status-done">Active</span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Edit ${u.name}`}
-                        onClick={() => setEditing(u)}
-                      >
-                        <PencilIcon strokeWidth={1.5} />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={disabled ? `Enable ${u.name}` : `Disable ${u.name}`}
+                          title={isSelf && !disabled ? 'You cannot disable your own account' : undefined}
+                          disabled={toggling === u.id || (isSelf && !disabled)}
+                          onClick={() => toggleDisabled(u)}
+                        >
+                          {disabled ? (
+                            <UserCheckIcon strokeWidth={1.5} />
+                          ) : (
+                            <UserXIcon strokeWidth={1.5} />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Edit ${u.name}`}
+                          onClick={() => setEditing(u)}
+                        >
+                          <PencilIcon strokeWidth={1.5} />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -276,33 +323,20 @@ export function UsersPage() {
       />
       <EditUserDialog
         user={editing}
-        currentlyDisabled={editing ? disabledIds.has(editing.id) : false}
+        currentlyDisabled={editing?.disabled === true}
         isSelf={!!editing && !!me && editing.id === me.id}
         onClose={() => setEditing(null)}
-        onSaved={(updated, nowDisabled) => {
+        onSaved={(updated) => {
           setRes((r) =>
             r
               ? {
                   ...r,
                   data: r.data.map((u) =>
-                    u.id === updated.id
-                      ? {
-                          ...u,
-                          name: updated.name,
-                          global_role: updated.global_role,
-                          project_ids: updated.project_ids,
-                        }
-                      : u,
+                    u.id === updated.id ? { ...u, ...updated, disabled: updated.disabled === true } : u,
                   ),
                 }
               : r,
           )
-          setDisabledIds((ids) => {
-            const next = new Set(ids)
-            if (nowDisabled) next.add(updated.id)
-            else next.delete(updated.id)
-            return next
-          })
           setEditing(null)
         }}
       />
@@ -514,7 +548,7 @@ function EditUserDialog({
   currentlyDisabled: boolean
   isSelf: boolean
   onClose: () => void
-  onSaved: (updated: User, nowDisabled: boolean) => void
+  onSaved: (updated: User) => void
 }) {
   const toast = useToast()
   const [name, setName] = useState('')
@@ -556,7 +590,7 @@ function EditUserDialog({
       if (nextDisabled !== currentlyDisabled) patch.disabled = nextDisabled
       const updated = await api.patchUser(user.id, patch)
       toast('User updated')
-      onSaved(updated, nextDisabled)
+      onSaved(updated)
     } catch {
       setErrors({ form: 'Could not update user.' })
     } finally {

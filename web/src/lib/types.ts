@@ -20,6 +20,7 @@ export type User = {
   name: string
   global_role: GlobalRole
   project_ids?: string[] // client role only, admin user-management responses
+  disabled?: boolean // true when soft-disabled (#45); omitted when active
 }
 
 export type UserCreate = {
@@ -98,6 +99,7 @@ export type Comment = {
   user_id: string
   body: string
   created_at: string
+  author: string // resolved display name (client-portal authors have no members row)
 }
 
 export type Paginated<T> = {
@@ -151,6 +153,19 @@ export type TaskEventsDay = {
   counts: Record<string, number>
 }
 
+/**
+ * GET /api/tasks/:id/events — one timeline row per transition (#44).
+ * from_status null = creation. The client surface (/client/tickets/:id/events)
+ * sends actor as {name} only — team-only fields never reach the portal.
+ */
+export type TaskActivityEvent = {
+  id: string
+  from_status: Status | null
+  to_status: Status
+  actor: { name: string } & Partial<User>
+  at: string
+}
+
 /** GET /api/client/projects — linked project for the submit-form picker. */
 export type ClientProjectRef = { id: string; key: string; name: string }
 
@@ -168,6 +183,17 @@ export type ClientTicket = {
   status: Status
   created_at: string
   updated_at: string
+}
+
+/**
+ * Client ticket comments (#43): {id, body, created_at, user:{name}} — no
+ * user_id/email; team comments show the author name only.
+ */
+export type ClientComment = {
+  id: string
+  body: string
+  created_at: string
+  user: { name: string }
 }
 
 /**

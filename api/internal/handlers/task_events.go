@@ -38,6 +38,100 @@ func eventsRows(now time.Time, days int) []eventsDay {
 	return rows
 }
 
+// activityEventJSON is one timeline row (issue #44). Team scope carries the
+// full actor user shape; the client surface swaps in clientActorJSON (name
+// only — an event row has no assessment/team fields, but an actor email is
+// still team data).
+type activityEventJSON struct {
+	ID         string      `json:"id"`
+	FromStatus *string     `json:"from_status"`
+	ToStatus   string      `json:"to_status"`
+	Actor      interface{} `json:"actor"`
+	At         time.Time   `json:"at"`
+}
+
+// clientActorJSON: actor name only on the client surface.
+type clientActorJSON struct {
+	Name string `json:"name"`
+}
+
+// activityEvents loads a task's transition log newest-first and resolves
+// actors in one batch. Missing actor rows fall back to "Unknown" (defensive
+// — actors are users, and users are never hard-deleted).
+func activityEvents(gdb *gorm.DB, taskID string, clientScope bool) ([]activityEventJSON, error) {
+	var evs []models.TaskEvent
+	if err := gdb.Where("task_id = ?", taskID).Order("at DESC, id DESC").Find(&evs).Error; err != nil {
+		return nil, err
+	}
+	actorIDs := make([]string, 0, len(evs))
+	for i := range evs {
+		actorIDs = append(actorIDs, evs[i].ActorID)
+	}
+	users := map[string]models.User{}
+	if len(actorIDs) > 0 {
+		var rows []models.User
+		if err := gdb.Where("id IN ?", actorIDs).Find(&rows).Error; err != nil {
+			return nil, err
+		}
+		for i := range rows {
+			users[rows[i].ID] = rows[i]
+		}
+	}
+	out := make([]activityEventJSON, len(evs))
+	for i := range evs {
+		out[i] = activityEventJSON{
+			ID: evs[i].ID, FromStatus: evs[i].FromStatus, ToStatus: evs[i].ToStatus, At: evs[i].At,
+		}
+		if a, ok := users[evs[i].ActorID]; ok {
+			if clientScope {
+				out[i].Actor = clientActorJSON{Name: a.Name}
+			} else {
+				u := a
+				out[i].Actor = toUserJSON(&u)
+			}
+		} else {
+			out[i].Actor = clientActorJSON{Name: "Unknown"}
+		}
+	}
+	return out, nil
+}
+
+// TaskActivity: GET /api/tasks/:id/events (issue #44) — the drawer's
+// activity timeline. Visibility-scoped like the task itself (loadVisibleTask:
+// trashed tasks stay reachable).
+func TaskActivity(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		t, ok := loadVisibleTask(c, gdb, u, c.Params("id"))
+		if !ok {
+			return nil
+		}
+		out, err := activityEvents(gdb, t.ID, false)
+		if err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not load activity")
+		}
+		return c.JSON(fiber.Map{"data": out})
+	}
+}
+
+// ClientTicketEvents: GET /api/client/tickets/:id/events (issue #44) — same
+// timeline through the portal: own tickets only (loadOwnTicket 404 no-leak),
+// actor name only.
+func ClientTicketEvents(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		t, ok := loadOwnTicket(c, gdb, u, c.Params("id"))
+		if !ok {
+			return nil
+		}
+		out, err := activityEvents(gdb, t.ID, true)
+		if err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not load activity")
+		}
+		return c.JSON(fiber.Map{"data": out})
+	}
+}
+
 // TaskEvents handler. See file comment for the walk.
 func TaskEvents(gdb *gorm.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {

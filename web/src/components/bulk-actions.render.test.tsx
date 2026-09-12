@@ -43,6 +43,8 @@ function mount(props: Partial<Parameters<typeof Topbar>[0]> = {}) {
         onToggleTheme={() => {}}
         me={me}
         onLogout={() => {}}
+        onProfile={() => {}}
+        onExport={() => {}}
         {...props}
       />,
     )

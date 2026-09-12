@@ -6,6 +6,7 @@ import {
   soleProjectAdmin,
   toMemberPayload,
   validateLabel,
+  validateProfile,
   validateProjectGeneral,
   validateProjectGithub,
   validateTeamName,
@@ -53,6 +54,38 @@ describe('validateUserEdit', () => {
     expect(validateUserEdit('  ', '').name).toBeTruthy()
     expect(validateUserEdit('Ada', 'short').password).toBeTruthy()
     expect(validateUserEdit('Ada', 'longenough')).toEqual({})
+  })
+})
+
+describe('validateProfile', () => {
+  const base = { name: 'Ada', currentPassword: '', newPassword: '', confirmPassword: '' }
+
+  it('passes with a name only (password untouched)', () => {
+    expect(validateProfile(base)).toEqual({})
+  })
+
+  it('requires the current password when changing', () => {
+    const errors = validateProfile({ ...base, newPassword: 'hunter2hunter2', confirmPassword: 'hunter2hunter2' })
+    expect(errors.currentPassword).toBeTruthy()
+    expect(errors.newPassword).toBeUndefined()
+  })
+
+  it('enforces the shared 8-char minimum', () => {
+    expect(
+      validateProfile({ ...base, currentPassword: 'x', newPassword: 'short', confirmPassword: 'short' })
+        .newPassword,
+    ).toBeTruthy()
+  })
+
+  it('requires confirmation to match', () => {
+    expect(
+      validateProfile({ ...base, currentPassword: 'x', newPassword: 'longenough', confirmPassword: 'other' })
+        .confirmPassword,
+    ).toBeTruthy()
+  })
+
+  it('requires a name', () => {
+    expect(validateProfile({ ...base, name: '  ' }).name).toBeTruthy()
   })
 })
 

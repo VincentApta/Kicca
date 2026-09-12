@@ -64,7 +64,7 @@ Entities, relationships, rules. See [[PRD]] for scope, [[api-contract]] for wire
 | timestamps | created_at, updated_at, deleted_at null | GORM soft delete = trash state |
 
 ### TaskEvent
-Analytics transition log — one row per status change (rule 8).
+Analytics transition log — one row per status change (rule 8). Also surfaced read-only as the activity timeline (#44): `GET /api/tasks/:id/events` (team, visibility like the task) and `GET /api/client/tickets/:id/events` (own tickets only; actor serialized as `{name}` — no email).
 | Field | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
@@ -87,7 +87,7 @@ Analytics transition log — one row per status change (rule 8).
 |---|---|---|
 | id | uuid PK | |
 | task_id | FK Task | cascade delete |
-| user_id | FK User | |
+| user_id | FK User | team member or the ticket's client (#43) |
 | body | text | markdown |
 | created_at | timestamp | editable window 15 min `ponytail:` |
 
@@ -156,8 +156,12 @@ erDiagram
 | Create/edit/move/comment tasks | ✅ | ✅ | ✅ |
 | Trash/restore tasks | ✅ | ✅ | ✅ |
 
-7. **Disabled user:** existing JWT rejected at middleware check (disabled_at lookup), sessions effectively dead; assigned tasks keep assignee (shows name, greyed).
+7. **Disabled user:** existing JWT rejected at middleware check (disabled_at lookup), sessions effectively dead; assigned tasks keep assignee (shows name, greyed). The admin Users page toggles it (#45): disabling sets disabled_at=now(), enabling clears it. Guards: an admin cannot disable their own account (409 `self_disable`), and the last enabled global admin cannot be disabled or demoted (409 `last_admin`).
 8. **Analytics stamps:** first entry into in_progress/review sets started_at (never overwritten); entry into done sets done_at; leaving done clears it (re-done re-stamps). Every status change (create counts, from NULL) writes a task_events row in the same transaction.
 9. **Client tickets (#32):** a client submits tickets only into linked projects (ClientProject row, else 404 no-leak); each lands as a Task with status=inbox, created_by=client, normal per-project numbering. Clients see only tickets they created (in linked projects) — never assessment or other team-only fields. Clients get 403 on all team endpoints; team users get 403 on /client/*. A client keeps ≥1 project link (enforced on create/patch).
+9a. **Client comments (#43):** on their OWN tickets (same loader as the portal isolation), a client reads the whole thread — team comments included, author NAME only — and replies through `/client/tickets/:id/comments` with the same `{body}` as the team endpoint. Comments live in the one comments table (user_id = the client); the team drawer shows them with the client's name (`author` on the team comment shape).
+9b. **Client ticket search (#47):** `GET /client/tickets` takes `q` (title/description, same predicate as the team list), `project_id` (must be linked — unlinked intersects to empty, no leak) and `status=open|closed` (open = not done). Scope stays own-tickets-in-linked-projects.
 10. **Attachments (#34):** storage is S3 when S3_BUCKET is set (credentials via the default AWS chain, optional S3_ENDPOINT), else a local dir (ATTACHMENTS_DIR, default /data/attachments, a mounted volume). Team attaches on any visible task; clients only on their own tickets, and their list/stream is limited to attachments they created (created_by check — mirror of the GET auth). Uploads: multipart `file`, content type sniffed server-side against the allowlist, size capped by ATTACHMENTS_MAX_MB. Creating a GitHub issue embeds each attachment via presigned S3 URL only (GitHub has no public upload API — probed; web-UI upload needs a browser session, not a PAT). Images `![](url)`, videos bare URL; 24h expiry. An attachment never blocks the issue: S3 presigns, local storage skips + logs.
 11. **Bulk actions (#46):** `PATCH /api/tasks/bulk` applies `status` and/or `assignee_id` to many tasks at once (ids may span projects). All-or-nothing: every id is validated (uuid, exists, project visibility per rule 1, not trashed for a column move) before a single transaction mutates anything; per-task failures return 422 with details. A status move appends at the target column end per task's project (rule 3 spacing) and stamps analytics (rule 8). `status:"trash"` is the bulk delete — same semantics as single delete (rule 4, no task_events row). Team-only: clients never see board/bulk surfaces.
+12. **Self-service profile (#49):** PATCH /api/me lets a non-admin user change their own name and password; a password change verifies the current password first (422 on mismatch). Email is the login identity and stays admin-only. Admins use the Users page instead (403 on /api/me).
+13. **CSV export (#50):** `GET /api/tasks/export` (team) and `GET /api/client/tickets/export` (client) return a text/csv attachment of the CURRENT filtered view — the same filters and the same visibility scoping as the corresponding list endpoints, via shared query builders. RFC4180 quoting (quote+double), header row, UTF-8 BOM. Team columns: id, number, title, status, priority, type, assignee, labels, created_by, created_at, updated_at, started_at, done_at, estimate, due_date, description (markdown as-is; assignee/created_by as names). Client columns stay client-safe (id, project, number, title, status, created_at, updated_at, description). `ponytail:` no date-range or format options v1.

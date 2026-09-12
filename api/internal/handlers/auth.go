@@ -18,16 +18,19 @@ import (
 // userJSON is the wire `user` shape: {id, email, name, global_role}. The
 // password hash is never serialized. ProjectIDs carries a client's project
 // links on the admin user-management responses only (omitempty elsewhere).
+// Disabled flags a soft-disabled account (issue #45 — Users page toggle);
+// omitted on active accounts.
 type userJSON struct {
 	ID         string   `json:"id"`
 	Email      string   `json:"email"`
 	Name       string   `json:"name"`
 	GlobalRole string   `json:"global_role"`
 	ProjectIDs []string `json:"project_ids,omitempty"`
+	Disabled   bool     `json:"disabled,omitempty"`
 }
 
 func toUserJSON(u *models.User) userJSON {
-	return userJSON{ID: u.ID, Email: u.Email, Name: u.Name, GlobalRole: u.GlobalRole}
+	return userJSON{ID: u.ID, Email: u.Email, Name: u.Name, GlobalRole: u.GlobalRole, Disabled: u.Disabled()}
 }
 
 // httpErr emits the contract error shape.
@@ -139,4 +142,57 @@ func Logout(c *fiber.Ctx) error {
 func Me(c *fiber.Ctx) error {
 	u := c.Locals(middleware.UserKey).(*models.User)
 	return c.JSON(fiber.Map{"user": toUserJSON(u)})
+}
+
+type patchMeReq struct {
+	Name            *string `json:"name"`
+	CurrentPassword *string `json:"current_password"`
+	NewPassword     *string `json:"new_password"`
+}
+
+// PatchMe: PATCH /api/me (#49) — self-service name + password change for the
+// CURRENT user only. Non-admin (admins keep the Users page). A password
+// change verifies the current password first; email never changes here (it's
+// the login identity — admin-only path). Behind RequireAuth.
+func PatchMe(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		if u.GlobalRole == roleAdmin {
+			return httpErr(c, fiber.StatusForbidden, "forbidden", "admins manage their own account on the Users page")
+		}
+		var req patchMeReq
+		if err := c.BodyParser(&req); err != nil {
+			return httpErr(c, fiber.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		}
+		updates := map[string]interface{}{}
+		if req.Name != nil {
+			if strings.TrimSpace(*req.Name) == "" {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "name must not be empty")
+			}
+			updates["name"] = strings.TrimSpace(*req.Name)
+		}
+		if req.NewPassword != nil {
+			if *req.NewPassword == "" {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "new_password must not be empty")
+			}
+			if req.CurrentPassword == nil || !auth.CheckPassword(u.PasswordHash, *req.CurrentPassword) {
+				return httpErr(c, fiber.StatusUnprocessableEntity, "validation_failed", "current password is incorrect")
+			}
+			hash, err := auth.HashPassword(*req.NewPassword)
+			if err != nil {
+				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not hash password")
+			}
+			updates["password_hash"] = hash
+		}
+		if len(updates) > 0 {
+			if err := gdb.Model(u).Updates(updates).Error; err != nil {
+				return httpErr(c, fiber.StatusInternalServerError, "internal", "could not update profile")
+			}
+		}
+		var fresh models.User
+		if err := gdb.First(&fresh, "id = ?", u.ID).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not reload user")
+		}
+		return c.JSON(toUserJSON(&fresh))
+	}
 }

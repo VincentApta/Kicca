@@ -330,18 +330,85 @@ func TestLastAdminGuard(t *testing.T) {
 		return ""
 	}()
 
-	for _, payload := range []string{`{"global_role":"member"}`, `{"disabled":true}`} {
+	for _, payload := range []string{`{"global_role":"member"}`} {
 		if status, body, _ := do(t, app, http.MethodPatch, "/api/users/"+adminID, payload, admin); status != http.StatusConflict || errCode(t, body) != "last_admin" {
 			t.Fatalf("last admin %s: got %d %v, want 409 last_admin", payload, status, body)
 		}
 	}
+	// disabling your own account trips the self guard first (#45), even as
+	// the last admin
+	if status, body, _ := do(t, app, http.MethodPatch, "/api/users/"+adminID, `{"disabled":true}`, admin); status != http.StatusConflict || errCode(t, body) != "self_disable" {
+		t.Fatalf("self disable as last admin: got %d %v, want 409 self_disable", status, body)
+	}
 
-	// a second admin unblocks both mutations (and the seed admin demotes fine)
+	// a second admin unblocks both mutations — and the last_admin disable
+	// path itself: admin2 can now disable the seed admin
 	if status, _ := createUserViaAPI(t, app, admin, "admin2@example.com", "admin2-pass-1", "admin"); status != http.StatusCreated {
 		t.Fatalf("create second admin: %d", status)
 	}
-	if status, _, _ := do(t, app, http.MethodPatch, "/api/users/"+adminID, `{"disabled":true}`, admin); status != http.StatusOK {
-		t.Fatalf("disable with second admin: got %d, want 200", status)
+	admin2 := loginAndGet(t, app, "admin2@example.com", "admin2-pass-1")
+	if status, body, _ := do(t, app, http.MethodPatch, "/api/users/"+adminID, `{"disabled":true}`, admin2); status != http.StatusOK {
+		t.Fatalf("admin2 disables seed admin: got %d %v, want 200", status, body)
+	}
+}
+
+// TestUserDisableToggleSerialization (#45): `disabled` serializes on the
+// user-management responses so the Users page toggle reflects server state;
+// self-disable is a 409 (admin lockout guard).
+func TestUserDisableToggleSerialization(t *testing.T) {
+	app, _ := newTestApp(t)
+	admin := loginAndGet(t, app, adminEmail, adminPass)
+
+	status, created := createUserViaAPI(t, app, admin, memberEmail, memberPass, "member")
+	if status != http.StatusCreated {
+		t.Fatalf("create member: got %d %v", status, created)
+	}
+	id, _ := created["id"].(string)
+	if _, present := created["disabled"]; present {
+		t.Fatalf("active user must omit disabled: %v", created)
+	}
+
+	// disable → response + list both carry disabled=true
+	status, body, _ := do(t, app, http.MethodPatch, "/api/users/"+id, `{"disabled":true}`, admin)
+	if status != http.StatusOK || body["disabled"] != true {
+		t.Fatalf("disable: got %d %v, want 200 disabled=true", status, body)
+	}
+	status, body, _ = do(t, app, http.MethodGet, "/api/users?per_page=100", "", admin)
+	if status != http.StatusOK {
+		t.Fatalf("list: got %d", status)
+	}
+	data, _ := body["data"].([]interface{})
+	var disabledRow map[string]interface{}
+	var myID string
+	for _, row := range data {
+		if rowMap(t, row)["id"] == id {
+			disabledRow = rowMap(t, row)
+		}
+		if rowMap(t, row)["global_role"] == "admin" && rowMap(t, row)["email"] == adminEmail {
+			myID = rowMap(t, row)["id"].(string)
+		}
+	}
+	if disabledRow == nil || disabledRow["disabled"] != true {
+		t.Fatalf("list row missing disabled=true: %v", disabledRow)
+	}
+
+	// self-disable → 409 self_disable (needs a second enabled admin so the
+	// last-admin guard isn't what trips it)
+	if status, _ := createUserViaAPI(t, app, admin, "admin2@example.com", "admin2-pass-1", "admin"); status != http.StatusCreated {
+		t.Fatalf("second admin: got %d", status)
+	}
+	status, body, _ = do(t, app, http.MethodPatch, "/api/users/"+myID, `{"disabled":true}`, admin)
+	if status != http.StatusConflict || errCode(t, body) != "self_disable" {
+		t.Fatalf("self disable: got %d %v, want 409 self_disable", status, body)
+	}
+
+	// enable → disabled omitted again (false)
+	status, body, _ = do(t, app, http.MethodPatch, "/api/users/"+id, `{"disabled":false}`, admin)
+	if status != http.StatusOK {
+		t.Fatalf("enable: got %d %v", status, body)
+	}
+	if _, present := body["disabled"]; present {
+		t.Fatalf("re-enabled user must omit disabled: %v", body)
 	}
 }
 
