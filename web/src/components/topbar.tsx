@@ -26,6 +26,7 @@ import type { Label, ProjectMember, Status, User } from '@/lib/types'
 import type { View } from './sidebar'
 import { NotificationBell } from './notifications'
 import { ExportRangeButton } from './export-range'
+import { SearchDropdown } from './search-dropdown'
 
 function FilterSelect({
   label,
@@ -87,6 +88,7 @@ export function Topbar({
   onBulkDelete,
   onExport,
   onOpenNotification,
+  onOpenProject,
 }: {
   project: { name: string; key: string } | null
   view: View
@@ -103,6 +105,7 @@ export function Topbar({
   onProfile: () => void
   onLogout: () => void
   onOpenNotification: (taskId: string, projectId: string) => void
+  onOpenProject?: (projectId: string) => void
   selectMode?: boolean // multi-select mode (issue #46): bulk actions replace filters
   selectedCount?: number
   onToggleSelectMode?: () => void
@@ -222,6 +225,11 @@ export function Topbar({
                   aria-label="Search tasks"
                   value={search}
                   onChange={(e) => onSearch(e.target.value)}
+                />
+                <SearchDropdown
+                  q={search}
+                  onOpenTask={onOpenNotification}
+                  onOpenProject={onOpenProject ?? (() => {})}
                 />
               </div>
             </>

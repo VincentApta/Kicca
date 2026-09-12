@@ -11,6 +11,7 @@ import type {
   Label,
   MovePayload,
   Notification as AppNotification,
+  SearchResult,
   Paginated,
   Priority,
   Project,
@@ -140,6 +141,9 @@ export const api = {
     req<void>(`/labels/${id}`, { method: 'DELETE' }),
   patchLabel: (id: string, body: { name?: string; color?: string }) =>
     req<Label>(`/labels/${id}`, { method: 'PATCH', body }),
+
+  // Global search (team) — cross-project tasks + projects
+  search: (q: string) => req<{ data: SearchResult }>(`/search?q=${encodeURIComponent(q)}`),
 
   // Notifications (bell)
   listNotifications: () => req<{ data: AppNotification[] }>(`/notifications`),

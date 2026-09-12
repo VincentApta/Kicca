@@ -365,7 +365,8 @@ export function Workspace() {
         currentProjectId={null} onSwitchProject={switchProject}
         onNavigate={setView} onMyTasks={() => setView('mytasks')} myTasksActive={false}
         settingsAvailable={false} selectMode={false} onExport={handleExport}
-        onOpenNotification={openTaskFromNotification}>
+        onOpenNotification={openTaskFromNotification}
+        onOpenProject={switchProject}>
         {view === 'teams' ? (
           <TeamsPage />
         ) : view === 'users' ? (
@@ -446,6 +447,7 @@ export function Workspace() {
       onBulkDelete={() => setConfirmBulkDelete(true)}
       onExport={handleExport}
       onOpenNotification={openTaskFromNotification}
+      onOpenProject={switchProject}
     >
       {view === 'overview' ? (
         <DashboardPage
@@ -677,6 +679,7 @@ type ShellProps = {
   onBulkDelete?: () => void
   onExport: () => void
   onOpenNotification: (taskId: string, projectId: string) => void
+  onOpenProject: (projectId: string) => void
 }
 
 function ShellFrame({ children, ...shell }: ShellProps) {
@@ -718,6 +721,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
           onBulkDelete={shell.onBulkDelete}
           onExport={shell.onExport}
           onOpenNotification={shell.onOpenNotification}
+          onOpenProject={shell.onOpenProject}
         />
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</main>
       </div>
