@@ -554,12 +554,12 @@ function DrawerBody({
               <p className="text-xs text-muted-foreground">No comments yet.</p>
             )}
             {comments?.map((c) => {
-              const author = members.find((m) => m.user_id === c.user_id)
+              const author = c.author || members.find((m) => m.user_id === c.user_id)?.name
               return (
                 <div key={c.id} className="card-neu p-3">
                   <p className="flex items-baseline gap-2">
                     <span className="text-xs font-medium text-foreground">
-                      {author?.name ?? 'User'}
+                      {author || 'User'}
                     </span>
                     <span className="font-mono text-xs text-muted-foreground">
                       {new Date(c.created_at).toLocaleDateString()}

@@ -3,6 +3,7 @@
 
 import type {
   Attachment,
+  ClientComment,
   ClientProjectRef,
   ClientTicket,
   Comment,
@@ -66,6 +67,16 @@ function fileForm(file: File): FormData {
   const fd = new FormData()
   fd.append('file', file)
   return fd
+}
+
+/** Cookie-authenticated CSV download (#50) — the response carries
+ *  Content-Disposition: attachment, so the browser downloads, no navigation. */
+export function downloadCsv(path: string) {
+  const a = document.createElement('a')
+  a.href = path
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }
 
 export const api = {
@@ -196,12 +207,47 @@ export const api = {
   // Client portal (client role only; team users get 403)
   clientListProjects: () =>
     req<{ data: ClientProjectRef[] }>('/client/projects'),
-  clientListTickets: (page = 1, perPage = 50) =>
-    req<Paginated<ClientTicket>>(`/client/tickets?page=${page}&per_page=${perPage}`),
+  clientListTickets: (
+    f: { q?: string; project_id?: string; status?: 'open' | 'closed' } = {},
+    page = 1,
+    perPage = 50,
+  ) => {
+    const p = new URLSearchParams({ page: String(page), per_page: String(perPage) })
+    for (const [k, v] of Object.entries(f)) {
+      if (v !== undefined && v !== '') p.set(k, v)
+    }
+    return req<Paginated<ClientTicket>>(`/client/tickets?${p}`)
+  },
   clientCreateTicket: (body: { project_id: string; title: string; description: string }) =>
     req<ClientTicket>('/client/tickets', { method: 'POST', body }),
   clientListTicketAttachments: (ticketId: string) =>
     req<{ data: Attachment[] }>(`/client/tickets/${ticketId}/attachments`),
   clientUploadTicketAttachment: (ticketId: string, file: File) =>
     req<Attachment>(`/client/tickets/${ticketId}/attachments`, { method: 'POST', body: fileForm(file) }),
+
+  // Client ticket comments (#43) — author name only in responses
+  clientListTicketComments: (ticketId: string) =>
+    req<{ data: ClientComment[] }>(`/client/tickets/${ticketId}/comments`),
+  clientAddTicketComment: (ticketId: string, body: string) =>
+    req<ClientComment>(`/client/tickets/${ticketId}/comments`, { method: 'POST', body: { body } }),
+
+  // CSV export (#50) — same filters as the corresponding list endpoints
+  exportTasks: (
+    f: { project_id?: string; status?: string; assignee_id?: string; priority?: string; label?: string; q?: string } = {},
+  ) => {
+    const p = new URLSearchParams()
+    for (const [k, v] of Object.entries(f)) {
+      if (v !== undefined && v !== '') p.set(k, v)
+    }
+    const qs = p.toString()
+    downloadCsv(`/api/tasks/export${qs ? `?${qs}` : ''}`)
+  },
+  clientExportTickets: (f: { q?: string; project_id?: string; status?: 'open' | 'closed' } = {}) => {
+    const p = new URLSearchParams()
+    for (const [k, v] of Object.entries(f)) {
+      if (v !== undefined && v !== '') p.set(k, v)
+    }
+    const qs = p.toString()
+    downloadCsv(`/api/client/tickets/export${qs ? `?${qs}` : ''}`)
+  },
 }
