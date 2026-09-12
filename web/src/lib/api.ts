@@ -168,6 +168,13 @@ export const api = {
     req<Task>(`/projects/${projectId}/tasks`, { method: 'POST', body }),
   patchTask: (id: string, body: TaskPatch) =>
     req<Task>(`/tasks/${id}`, { method: 'PATCH', body }),
+  // Bulk actions (#46): all-or-nothing server-side; 422 carries per-task
+  // failures in error.details.
+  bulkTasks: (ids: string[], body: { status?: Status; assignee_id?: string | null }) =>
+    req<{ updated: number; data: Task[] }>('/tasks/bulk', {
+      method: 'PATCH',
+      body: { ids, ...body },
+    }),
   deleteTask: (id: string) => req<void>(`/tasks/${id}`, { method: 'DELETE' }),
   restoreTask: (id: string) =>
     req<Task>(`/tasks/${id}/restore`, { method: 'POST' }),

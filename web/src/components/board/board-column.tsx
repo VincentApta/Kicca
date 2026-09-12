@@ -15,12 +15,18 @@ export function BoardColumn({
   projectKey,
   onOpen,
   onAdd,
+  selectable = false,
+  selectedIds,
+  onSelect,
 }: {
   status: Status
   tasks: Task[]
   projectKey: string
   onOpen: (id: string) => void
   onAdd: (status: Status) => void
+  selectable?: boolean
+  selectedIds?: Set<string>
+  onSelect?: (id: string, shiftKey: boolean) => void
 }) {
   const id = `col-${status}`
   const { setNodeRef, isOver } = useDroppable({ id, data: { type: 'column', status } })
@@ -49,7 +55,15 @@ export function BoardColumn({
       >
         <SortableContext id={id} items={tasks.map((t) => t.id)}>
           {tasks.map((t) => (
-            <TaskCard key={t.id} task={t} projectKey={projectKey} onOpen={onOpen} />
+            <TaskCard
+              key={t.id}
+              task={t}
+              projectKey={projectKey}
+              onOpen={onOpen}
+              selectable={selectable}
+              selected={selectedIds?.has(t.id) ?? false}
+              onSelect={onSelect}
+            />
           ))}
         </SortableContext>
         {tasks.length === 0 && (

@@ -75,6 +75,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	tasks := api.Group("/tasks", middleware.RequireTeam(jwtSecret, gdb))
 	tasks.Get("/", MyTasks(gdb))
 	tasks.Get("/events", TaskEvents(gdb))
+	tasks.Patch("/bulk", BulkPatchTasks(gdb))
 	tasks.Get("/:id", GetTask(gdb))
 	tasks.Patch("/:id", PatchTask(gdb))
 	tasks.Delete("/:id", DeleteTask(gdb))

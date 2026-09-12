@@ -1,4 +1,7 @@
-import { ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareKanbanIcon, SunIcon, XIcon } from 'lucide-react'
+import {
+  ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareCheckIcon,
+  SquareKanbanIcon, SunIcon, Trash2Icon, XIcon,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -17,9 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { BOARD_STATUSES, PRIORITY_ORDER, filtersActive, type TaskFilters } from '@/lib/board'
+import { BOARD_STATUSES, PRIORITY_ORDER, STATUS_LABEL, filtersActive, type TaskFilters } from '@/lib/board'
 import { PRIORITY_LABELS, STATUS_LABELS, SelectLabel } from '@/lib/labels'
-import type { Label, ProjectMember, User } from '@/lib/types'
+import type { Label, ProjectMember, Status, User } from '@/lib/types'
 import type { View } from './sidebar'
 
 function FilterSelect({
@@ -72,6 +75,13 @@ export function Topbar({
   onToggleTheme,
   me,
   onLogout,
+  selectMode = false,
+  selectedCount = 0,
+  onToggleSelectMode,
+  onExitSelect,
+  onBulkStatus,
+  onBulkAssign,
+  onBulkDelete,
 }: {
   project: { name: string; key: string } | null
   view: View
@@ -86,10 +96,18 @@ export function Topbar({
   onToggleTheme: () => void
   me: User
   onLogout: () => void
+  selectMode?: boolean // multi-select mode (issue #46): bulk actions replace filters
+  selectedCount?: number
+  onToggleSelectMode?: () => void
+  onExitSelect?: () => void
+  onBulkStatus?: (s: Status) => void
+  onBulkAssign?: (id: string | null) => void
+  onBulkDelete?: () => void
 }) {
   const showBoardControls = view === 'board' || view === 'list' || view === 'trash'
   const inProjectView = showBoardControls || view === 'settings'
-  const nActive = showBoardControls ? filtersActive(filters) + (search.trim() ? 1 : 0) : 0
+  const showFilters = showBoardControls && !selectMode
+  const nActive = showFilters ? filtersActive(filters) + (search.trim() ? 1 : 0) : 0
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/60 px-4">
@@ -128,57 +146,121 @@ export function Topbar({
             </button>
           </div>
 
-          <div className="relative ml-2 min-w-48 flex-1 max-w-xs">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
-            <Input
-              className="inset-neu border-0 pl-8"
-              placeholder="Search tasks…"
-              aria-label="Search tasks"
-              value={search}
-              onChange={(e) => onSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="hidden items-center gap-1.5 md:flex">
-            <FilterSelect
-              label="Assignee"
-              value={filters.assignee_id}
-              options={members.map((m) => ({ value: m.user_id, label: m.name }))}
-              onChange={(v) => onFilters({ ...filters, assignee_id: v })}
-            />
-            <FilterSelect
-              label="Priority"
-              value={filters.priority}
-              options={PRIORITY_ORDER.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
-              onChange={(v) => onFilters({ ...filters, priority: v })}
-            />
-            <FilterSelect
-              label="Label"
-              value={filters.label_id}
-              options={labels.map((l) => ({ value: l.id, label: l.name }))}
-              onChange={(v) => onFilters({ ...filters, label_id: v })}
-            />
-            <FilterSelect
-              label="Status"
-              value={filters.status}
-              options={BOARD_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
-              onChange={(v) => onFilters({ ...filters, status: v })}
-            />
-            {nActive > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  onFilters({ q: '', assignee_id: '', priority: '', label_id: '', status: '' })
-                  onSearch('')
+          {selectMode ? (
+            <div className="ml-2 flex flex-1 items-center gap-1.5" role="group" aria-label="Bulk actions">
+              <span className="shrink-0 text-xs font-medium text-primary">
+                {selectedCount} selected
+              </span>
+              <Select onValueChange={(v) => v !== null && onBulkStatus?.(v as Status)}>
+                <SelectTrigger size="sm" className="inset-neu border-0 text-xs" aria-label="Move to column">
+                  <SelectValue placeholder="Move to…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {BOARD_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                onValueChange={(v) => {
+                  if (v == null) return
+                  const s = String(v)
+                  onBulkAssign?.(s === 'unassign' ? null : s)
                 }}
-                className="btn-neu flex h-7 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
-                title="Clear filters"
               >
-                <XIcon className="size-3.5" strokeWidth={1.5} />
-                {nActive}
-              </button>
-            )}
-          </div>
+                <SelectTrigger size="sm" className="inset-neu border-0 text-xs" aria-label="Assign to member">
+                  <SelectValue placeholder="Assign…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => (
+                    <SelectItem key={m.user_id} value={m.user_id}>{m.name}</SelectItem>
+                  ))}
+                  <SelectItem value="unassign">Unassign</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label="Delete selected"
+                onClick={onBulkDelete}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2Icon strokeWidth={1.5} />
+                Delete
+              </Button>
+              <Button size="sm" variant="ghost" onClick={onExitSelect} aria-label="Deselect all">
+                <XIcon strokeWidth={1.5} />
+                Clear
+              </Button>
+            </div>
+          ) : (
+            <>
+              {(view === 'board' || view === 'list') && (
+                <button
+                  type="button"
+                  aria-pressed={false}
+                  onClick={onToggleSelectMode}
+                  className="btn-neu ml-2 flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <SquareCheckIcon className="size-3.5" strokeWidth={1.5} />
+                  Select
+                </button>
+              )}
+              <div className="relative ml-2 min-w-48 flex-1 max-w-xs">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+                <Input
+                  className="inset-neu border-0 pl-8"
+                  placeholder="Search tasks…"
+                  aria-label="Search tasks"
+                  value={search}
+                  onChange={(e) => onSearch(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {showFilters && (
+            <div className="hidden items-center gap-1.5 md:flex">
+              <FilterSelect
+                label="Assignee"
+                value={filters.assignee_id}
+                options={members.map((m) => ({ value: m.user_id, label: m.name }))}
+                onChange={(v) => onFilters({ ...filters, assignee_id: v })}
+              />
+              <FilterSelect
+                label="Priority"
+                value={filters.priority}
+                options={PRIORITY_ORDER.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
+                onChange={(v) => onFilters({ ...filters, priority: v })}
+              />
+              <FilterSelect
+                label="Label"
+                value={filters.label_id}
+                options={labels.map((l) => ({ value: l.id, label: l.name }))}
+                onChange={(v) => onFilters({ ...filters, label_id: v })}
+              />
+              <FilterSelect
+                label="Status"
+                value={filters.status}
+                options={BOARD_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))}
+                onChange={(v) => onFilters({ ...filters, status: v })}
+              />
+              {nActive > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onFilters({ q: '', assignee_id: '', priority: '', label_id: '', status: '' })
+                    onSearch('')
+                  }}
+                  className="btn-neu flex h-7 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
+                  title="Clear filters"
+                >
+                  <XIcon className="size-3.5" strokeWidth={1.5} />
+                  {nActive}
+                </button>
+              )}
+            </div>
+          )}
         </>
       )}
 

@@ -61,6 +61,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | POST | /projects/:id/tasks | `{title, description?, status?, priority?, type?, estimate?, assignee_id?, due_date?, label_ids?[]}` | 201 task; defaults status=backlog priority=medium type=task |
 | GET | /tasks/:id | — | task + labels + gh_link + comments separate |
 | PATCH | /tasks/:id | any task field incl. `status`, `position`, `type`, `estimate` (null clears) | member+ |
+| PATCH | /tasks/bulk | `{ids[], status?, assignee_id?}` (assignee_id null unassigns) | team-only (#46); all-or-nothing: every id validated (exists + visible) before one transaction mutates; 200 `{updated, data: [task]}`; any failure → 422 with `error.details: [{task_id, message}]`, nothing changed; status move appends at column end + stamps analytics (rule 8); `status:"trash"` = bulk soft delete (rule 4) |
 | DELETE | /tasks/:id | — | trash (soft); `?purge=1` admin hard delete |
 | POST | /tasks/:id/restore | — | back to backlog |
 | POST | /tasks/:id/move | `{status, before_task_id?, after_task_id?}` | server computes position; stamps analytics (rule 8) |
