@@ -181,59 +181,109 @@ func setCookieHas(t *testing.T, h http.Header, attr string) bool {
 	return false
 }
 
-func TestLoginRateLimit(t *testing.T) {
+// TestLoginLockout: 5 consecutive failures per email+IP lock login for
+// 15 minutes (fiber's test conn always reports the same remote addr, so the
+// email part of the key is what varies here).
+func TestLoginLockout(t *testing.T) {
 	app, _ := newTestApp(t)
 
-	// 10 bad logins (fiber's test conn always reports the same remote addr,
-	// so IP and email buckets trip together here) → 401 ×10, then 429
-	badCreds := func() (int, map[string]interface{}) {
+	badCreds := func(email string) (int, map[string]interface{}, string) {
+		status, body, h := do(t, app, http.MethodPost, "/api/auth/login",
+			`{"email":"`+email+`","password":"wrong"}`, "")
+		return status, body, h.Get("Retry-After")
+	}
+
+	// failures 1–5 → 401; the 5th starts the lockout
+	for i := 0; i < 5; i++ {
+		if status, body, _ := badCreds(adminEmail); status != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: got %d %v, want 401", i+1, status, body)
+		}
+	}
+	status, body, retryAfter := badCreds(adminEmail)
+	if status != http.StatusTooManyRequests || errCode(t, body) != "rate_limited" {
+		t.Fatalf("6th attempt: got %d %v, want 429 rate_limited", status, body)
+	}
+	if retryAfter != "900" {
+		t.Fatalf("Retry-After: got %q, want 900", retryAfter)
+	}
+	e, _ := body["error"].(map[string]interface{})
+	if msg, _ := e["message"].(string); !strings.Contains(msg, "15 minutes") {
+		t.Fatalf("429 body missing retry info: %v", body)
+	}
+
+	// locked key guards the DB lookup: valid credentials also 429
+	if status, _, _ := do(t, app, http.MethodPost, "/api/auth/login",
+		`{"email":"`+adminEmail+`","password":"`+adminPass+`"}`, ""); status != http.StatusTooManyRequests {
+		t.Fatalf("valid creds while locked: got %d, want 429", status)
+	}
+
+	// the key includes the email: a different email is a fresh bucket
+	if status, body, _ := badCreds("other@example.com"); status != http.StatusUnauthorized {
+		t.Fatalf("other email: got %d %v, want 401", status, body)
+	}
+}
+
+// TestLoginLockoutResetBySuccess: any successful login clears the streak.
+func TestLoginLockoutResetBySuccess(t *testing.T) {
+	app, _ := newTestApp(t)
+	bad := func() (int, map[string]interface{}) {
 		status, body, _ := do(t, app, http.MethodPost, "/api/auth/login",
 			`{"email":"`+adminEmail+`","password":"wrong"}`, "")
 		return status, body
 	}
-	for i := 0; i < 10; i++ {
-		if status, body := badCreds(); status != http.StatusUnauthorized {
+
+	for i := 0; i < 4; i++ {
+		if status, body := bad(); status != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: got %d %v, want 401", i+1, status, body)
 		}
 	}
-	if status, body := badCreds(); status != http.StatusTooManyRequests || errCode(t, body) != "rate_limited" {
-		t.Fatalf("11th attempt: got %d %v, want 429 rate_limited", status, body)
+	if status, _, _ := do(t, app, http.MethodPost, "/api/auth/login",
+		`{"email":"`+adminEmail+`","password":"`+adminPass+`"}`, ""); status != http.StatusOK {
+		t.Fatal("success after 4 failures: want 200")
 	}
-
-	// the limit guards the DB lookup: valid credentials also 429
-	if status, body, _ := do(t, app, http.MethodPost, "/api/auth/login",
-		`{"email":"`+adminEmail+`","password":"`+adminPass+`"}`, ""); status != http.StatusTooManyRequests {
-		t.Fatalf("valid creds while limited: got %d %v, want 429", status, body)
+	// streak restarted: 5 more failures needed before the lockout
+	for i := 0; i < 5; i++ {
+		if status, body := bad(); status != http.StatusUnauthorized {
+			t.Fatalf("post-reset attempt %d: got %d %v, want 401", i+1, status, body)
+		}
 	}
-
-	// a different email from the same source is still IP-limited
-	if status, body, _ := do(t, app, http.MethodPost, "/api/auth/login",
-		`{"email":"other@example.com","password":"x"}`, ""); status != http.StatusTooManyRequests {
-		t.Fatalf("other email same ip: got %d %v, want 429", status, body)
+	if status, body := bad(); status != http.StatusTooManyRequests {
+		t.Fatalf("after 5 post-reset failures: got %d %v, want 429", status, body)
 	}
 }
 
-func TestLoginLimiterKeys(t *testing.T) {
-	// unit test: the two buckets are independent per key and the window slides
-	l := newLoginLimiter()
+// TestLoginGuardExpiry: unit test on the guard itself (clock injected).
+func TestLoginGuardExpiry(t *testing.T) {
+	g := newLoginGuard()
 	now := time.Now()
-	for i := 0; i < 10; i++ {
-		if !l.allow("ip:1.2.3.4", now) {
-			t.Fatalf("ip attempt %d: want allowed", i+1)
-		}
+	key := "a@example.com|1.2.3.4"
+
+	for i := 0; i < 4; i++ {
+		g.fail(key, now)
 	}
-	if l.allow("ip:1.2.3.4", now) {
-		t.Fatal("ip over limit: want denied")
+	if left := g.remaining(key, now); left != 0 {
+		t.Fatalf("4 failures: locked for %v, want 0", left)
 	}
-	if !l.allow("ip:5.6.7.8", now) {
-		t.Fatal("other ip must be unaffected")
+	g.fail(key, now) // 5th — lockout starts
+	if left := g.remaining(key, now); left <= 0 || left > 15*time.Minute {
+		t.Fatalf("5 failures: left=%v, want (0, 15m]", left)
 	}
-	if !l.allow("email:x@example.com", now) {
-		t.Fatal("email bucket must be unaffected by ip bucket")
+	if left := g.remaining(key, now.Add(15*time.Minute)); left != 0 {
+		t.Fatalf("after lockout: left=%v, want 0", left)
 	}
-	// one window later everything is allowed again
-	if !l.allow("ip:1.2.3.4", now.Add(l.window+time.Second)) {
-		t.Fatal("after window: want allowed")
+	// a failure after expiry starts a fresh streak, not an instant re-lock
+	later := now.Add(15*time.Minute + time.Second)
+	g.fail(key, later)
+	if left := g.remaining(key, later); left != 0 {
+		t.Fatalf("fresh streak: left=%v, want 0", left)
+	}
+	// clear wipes even an active lockout
+	for i := 0; i < 5; i++ {
+		g.fail(key, later)
+	}
+	g.clear(key)
+	if left := g.remaining(key, later.Add(time.Second)); left != 0 {
+		t.Fatalf("after clear: left=%v, want 0", left)
 	}
 }
 

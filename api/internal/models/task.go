@@ -64,7 +64,7 @@ type TaskLabel struct {
 	LabelID string `gorm:"primaryKey;type:uuid"`
 }
 
-// Comment: editable window 15 min `ponytail:` (domain).
+// Comment: post-only (no edit/delete; domain decision).
 type Comment struct {
 	ID        string `gorm:"primaryKey;type:uuid"`
 	TaskID    string `gorm:"not null;index;type:uuid"`

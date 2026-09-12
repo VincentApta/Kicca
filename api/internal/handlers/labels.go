@@ -22,6 +22,11 @@ type createLabelReq struct {
 	Color *string `json:"color"`
 }
 
+type patchLabelReq struct {
+	Name  *string `json:"name"`
+	Color *string `json:"color"`
+}
+
 // labelJSON is the wire `label` shape (task.labels and project label list).
 type labelJSON struct {
 	ID    string `json:"id"`
@@ -121,5 +126,59 @@ func DeleteLabel(gdb *gorm.DB) fiber.Handler {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not delete label")
 		}
 		return c.SendStatus(fiber.StatusNoContent)
+	}
+}
+
+// PatchLabel: PATCH /api/labels/:id — project_admin+. Updates name and/or
+// color; same visibility/role guard as DeleteLabel.
+func PatchLabel(gdb *gorm.DB) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		u := currentUser(c)
+		id := c.Params("id")
+		if _, err := uuid.Parse(id); err != nil {
+			return httpErr(c, fiber.StatusBadRequest, "invalid_uuid", "label id must be a uuid")
+		}
+		var req patchLabelReq
+		if err := c.BodyParser(&req); err != nil {
+			return httpErr(c, fiber.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		}
+		if req.Name == nil && req.Color == nil {
+			return httpErr(c, fiber.StatusBadRequest, "empty_patch", "nothing to update")
+		}
+		if req.Name != nil {
+			name := strings.TrimSpace(*req.Name)
+			if name == "" {
+				return httpErr(c, fiber.StatusBadRequest, "invalid_name", "label name must not be empty")
+			}
+			req.Name = &name
+		}
+		if req.Color != nil && !labelColorRe.MatchString(strings.TrimSpace(*req.Color)) {
+			return httpErr(c, fiber.StatusBadRequest, "invalid_color", "color must be a #RRGGBB hex value")
+		}
+		var l models.Label
+		if err := gdb.First(&l, "id = ?", id).Error; err != nil {
+			return httpErr(c, fiber.StatusNotFound, "not_found", "no such label")
+		}
+		_, pm, ok := loadVisibleProject(c, gdb, u, l.ProjectID)
+		if !ok {
+			return nil
+		}
+		if u.GlobalRole != roleAdmin && (pm == nil || pm.Role != roleProjectAdmin) {
+			return httpErr(c, fiber.StatusForbidden, "forbidden", "project admin role required")
+		}
+		updates := map[string]any{}
+		if req.Name != nil {
+			updates["name"] = *req.Name
+		}
+		if req.Color != nil {
+			updates["color"] = strings.TrimSpace(*req.Color)
+		}
+		if err := gdb.Model(&l).Updates(updates).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not update label")
+		}
+		if err := gdb.First(&l, "id = ?", id).Error; err != nil {
+			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not reload label")
+		}
+		return c.JSON(toLabelJSON(&l))
 	}
 }

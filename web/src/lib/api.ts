@@ -137,6 +137,8 @@ export const api = {
     req<Label>(`/projects/${projectId}/labels`, { method: 'POST', body }),
   deleteLabel: (id: string) =>
     req<void>(`/labels/${id}`, { method: 'DELETE' }),
+  patchLabel: (id: string, body: { name?: string; color?: string }) =>
+    req<Label>(`/labels/${id}`, { method: 'PATCH', body }),
 
   // Tasks feed (global, cross-project). assigneeId optional — omit for all members.
   myFetchMyTasks: (assigneeId?: string, page = 1, perPage = 100, assigneeIds?: string[]) =>

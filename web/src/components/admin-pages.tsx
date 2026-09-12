@@ -963,8 +963,6 @@ function TeamMembersDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Team members — {team?.name}</DialogTitle>
-          {/* ponytail: GET /teams/:id/members doesn't exist, so current
-              membership can't be preselected — saving replaces it wholesale. */}
           <DialogDescription>
             Saving replaces the team's whole membership with the selection.
           </DialogDescription>
@@ -1587,6 +1585,41 @@ function LabelsTab({
   const [color, setColor] = useState('#94a3b8')
   const [errors, setErrors] = useState<FieldErrors>({})
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState<LabelT | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState('#94a3b8')
+  const [editBusy, setEditBusy] = useState(false)
+  const [editErr, setEditErr] = useState<FieldErrors>({})
+
+  function openEdit(l: LabelT) {
+    setEditing(l)
+    setEditName(l.name)
+    setEditColor(l.color)
+    setEditErr({})
+  }
+
+  async function saveEdit(e: FormEvent) {
+    e.preventDefault()
+    if (!editing) return
+    const v = validateLabel({ name: editName, color: editColor })
+    setEditErr(v)
+    if (Object.keys(v).length > 0) return
+    setEditBusy(true)
+    try {
+      await api.patchLabel(editing.id, { name: editName.trim(), color: editColor })
+      toast('Label updated')
+      setEditing(null)
+      onRefresh()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setEditErr({ name: 'A label with this name already exists.' })
+      } else {
+        setEditErr({ form: 'Could not update label.' })
+      }
+    } finally {
+      setEditBusy(false)
+    }
+  }
 
   async function create(e: FormEvent) {
     e.preventDefault()
@@ -1622,8 +1655,6 @@ function LabelsTab({
 
   return (
     <div className="flex max-w-lg flex-col gap-4">
-      {/* ponytail: label editing (rename/recolor) needs a PATCH /labels/:id
-          endpoint — the contract ships create/delete only. */}
       <form className="flex items-end gap-2" onSubmit={create}>
         <div className="w-16">
           <Label htmlFor="label-color" className="text-xs text-muted-foreground">Color</Label>
@@ -1680,6 +1711,14 @@ function LabelsTab({
             <Button
               variant="ghost"
               size="icon-sm"
+              aria-label={`Edit label ${l.name}`}
+              onClick={() => openEdit(l)}
+            >
+              <PencilIcon strokeWidth={1.5} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
               aria-label={`Delete label ${l.name}`}
               onClick={() => remove(l)}
             >
@@ -1688,6 +1727,44 @@ function LabelsTab({
           </div>
         ))}
       </div>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit label</DialogTitle>
+            <DialogDescription>Rename or recolor «{editing?.name}».</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={saveEdit} className="flex items-end gap-2">
+            <div className="w-16">
+              <Label htmlFor="edit-label-color" className="text-xs text-muted-foreground">Color</Label>
+              <input
+                id="edit-label-color"
+                type="color"
+                className="inset-neu mt-2 h-8 w-16 cursor-pointer p-0.5"
+                value={editColor}
+                onChange={(e) => setEditColor(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <Field label="Name" htmlFor="edit-label-name" error={editErr.name}>
+                <Input
+                  id="edit-label-name"
+                  className="inset-neu"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                />
+              </Field>
+            </div>
+            <Button type="submit" disabled={editBusy}>
+              <PencilIcon strokeWidth={1.5} />
+              {editBusy ? 'Saving…' : 'Save'}
+            </Button>
+          </form>
+          {editErr.form && (
+            <p role="alert" className="text-sm text-destructive">{editErr.form}</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -99,9 +99,10 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	blobs.Get("/:id", GetAttachment(gdb))
 	blobs.Delete("/:id", middleware.RequireTeam(jwtSecret, gdb), DeleteAttachment(gdb))
 
-	// labels — DELETE only (creation is per-project above)
+	// labels — PATCH + DELETE (creation is per-project above)
 	labels := api.Group("/labels", middleware.RequireTeam(jwtSecret, gdb))
 	labels.Delete("/:id", DeleteLabel(gdb))
+	labels.Patch("/:id", PatchLabel(gdb))
 
 	// client portal — clients only (team users get 403). Static group before
 	// nothing parametric; registered last per the static-first convention.

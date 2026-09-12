@@ -15,7 +15,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 ### Auth
 | Method | Path | Body | Response | Notes |
 |---|---|---|---|---|
-| POST | /auth/login | `{email, password}` | 200 `{user}` + cookie | 401 invalid/disabled |
+| POST | /auth/login | `{email, password}` | 200 `{user}` + cookie | 401 invalid/disabled | 429 after 5 fails/15 min per email+IP (Retry-After; in-memory) |
 | POST | /auth/logout | — | 204 | clears cookie |
 | GET | /auth/me | — | 200 `{user}` | |
 | PATCH | /me | `{name?, current_password?, new_password?}` | 200 user | self-service profile (#49), non-admin only (admin → 403); password change verifies current_password (422 on mismatch); email never changes here |
@@ -50,6 +50,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | PUT | /projects/:id/github | `{repo: "owner/name", token}` | admin/project_admin; token never returned |
 | GET | /projects/:id/labels · POST | `{name, color}` · list | project_admin manages |
 | DELETE | /labels/:id | — | |
+| PATCH | /labels/:id | `{name?, color?}` (at least one; color #RRGGBB) | project_admin+ (label edit); 200 updated label |
 
 ### Tasks
 | Method | Path | Body/Query | Notes |

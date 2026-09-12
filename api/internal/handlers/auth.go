@@ -3,6 +3,8 @@
 package handlers
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,79 +45,101 @@ type loginReq struct {
 	Password string `json:"password"`
 }
 
-// loginLimiter: fixed-window rate limiter over arbitrary keys (the login
-// handler uses "ip:<addr>" and "email:<addr>"). Simple in-memory — fine for
-// one api container. `ponytail:` shared store + trusted-proxy config if the
-// api ever scales beyond that.
-type loginLimiter struct {
+// loginGuard: in-memory failed-login tracker. Key = lowercase(email) + "|" +
+// client IP. 5 consecutive failures lock the key for 15 minutes; any
+// successful login clears it. Process-local state (lost on restart —
+// acceptable). `ponytail:` swap to a Redis-backed store if multiple API
+// replicas ever run.
+type loginGuard struct {
 	mu        sync.Mutex
-	window    time.Duration
-	limit     int
-	hits      map[string][]time.Time
+	maxFails  int
+	lockout   time.Duration
+	entries   map[string]loginEntry
 	lastSweep time.Time
 }
 
-func newLoginLimiter() *loginLimiter {
-	return &loginLimiter{window: time.Minute, limit: 10, hits: map[string][]time.Time{}}
+type loginEntry struct {
+	fails       int
+	lockedUntil time.Time
 }
 
-// allow records a hit on key unless the window already holds limit hits.
-func (l *loginLimiter) allow(key string, now time.Time) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+func newLoginGuard() *loginGuard {
+	return &loginGuard{maxFails: 5, lockout: 15 * time.Minute, entries: map[string]loginEntry{}}
+}
+
+// remaining reports lockout time left for key (0 = not locked).
+func (g *loginGuard) remaining(key string, now time.Time) time.Duration {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	e, ok := g.entries[key]
+	if !ok || !now.Before(e.lockedUntil) {
+		return 0
+	}
+	return e.lockedUntil.Sub(now)
+}
+
+// fail records a failure; the maxFails-th consecutive one starts the lockout.
+func (g *loginGuard) fail(key string, now time.Time) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	// occasional sweep so keys that go quiet don't accumulate forever
-	if now.Sub(l.lastSweep) > l.window {
-		for k, v := range l.hits {
-			l.prune(k, v, now)
+	if now.Sub(g.lastSweep) > g.lockout {
+		for k, e := range g.entries {
+			if !now.Before(e.lockedUntil) {
+				delete(g.entries, k)
+			}
 		}
-		l.lastSweep = now
+		g.lastSweep = now
 	}
-	hits := l.prune(key, l.hits[key], now)
-	if len(hits) >= l.limit {
-		l.hits[key] = hits
-		return false
+	e := g.entries[key]
+	if !e.lockedUntil.IsZero() && !now.Before(e.lockedUntil) {
+		e.fails = 0 // expired lockout — start a fresh streak
 	}
-	l.hits[key] = append(hits, now)
-	return true
+	e.fails++
+	if e.fails >= g.maxFails {
+		e.lockedUntil = now.Add(g.lockout)
+	}
+	g.entries[key] = e
 }
 
-// prune drops expired timestamps; empty slices delete their key.
-func (l *loginLimiter) prune(key string, hits []time.Time, now time.Time) []time.Time {
-	kept := hits[:0]
-	for _, h := range hits {
-		if now.Sub(h) < l.window {
-			kept = append(kept, h)
-		}
-	}
-	if len(kept) == 0 {
-		delete(l.hits, key)
-	}
-	return kept
+// clear drops the key — a successful login resets the streak.
+func (g *loginGuard) clear(key string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.entries, key)
 }
 
 // Login: POST /api/auth/login → 200 {user} + session cookie. 401 on bad
-// credentials or disabled account. 429 after 10 attempts/min per IP and per
-// email (checked before the DB lookup — bad creds shouldn't be free either).
+// credentials or disabled account. 429 for 15 minutes after 5 consecutive
+// failures per email+IP (Retry-After set, minutes left in the message);
+// checked before the DB lookup — bad creds shouldn't be free either. Any
+// successful login clears the streak.
 func Login(jwtSecret string, gdb *gorm.DB) fiber.Handler {
-	limiter := newLoginLimiter()
+	guard := newLoginGuard()
 	return func(c *fiber.Ctx) error {
 		var req loginReq
 		if err := c.BodyParser(&req); err != nil {
 			return httpErr(c, fiber.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		}
 		email := strings.ToLower(strings.TrimSpace(req.Email))
+		key := email + "|" + c.IP()
 		now := time.Now()
-		if !limiter.allow("ip:"+c.IP(), now) || !limiter.allow("email:"+email, now) {
-			return httpErr(c, fiber.StatusTooManyRequests, "rate_limited", "too many login attempts, try again in a minute")
+		if left := guard.remaining(key, now); left > 0 {
+			minutes := int((left + time.Minute - 1) / time.Minute) // ceil
+			c.Set("Retry-After", strconv.Itoa(int((left+time.Second-1)/time.Second)))
+			return httpErr(c, fiber.StatusTooManyRequests, "rate_limited",
+				fmt.Sprintf("too many failed login attempts, try again in %d minutes", minutes))
 		}
 		var user models.User
 		err := gdb.First(&user, "email = ?", email).Error
 		if err != nil || !auth.CheckPassword(user.PasswordHash, req.Password) {
+			guard.fail(key, now)
 			return httpErr(c, fiber.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		}
 		if user.Disabled() {
 			return httpErr(c, fiber.StatusUnauthorized, "account_disabled", "account is disabled")
 		}
+		guard.clear(key)
 		token, err := auth.SignToken(jwtSecret, user.ID)
 		if err != nil {
 			return httpErr(c, fiber.StatusInternalServerError, "internal", "could not create session")

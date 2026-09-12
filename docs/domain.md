@@ -89,7 +89,7 @@ Analytics transition log — one row per status change (rule 8). Also surfaced r
 | task_id | FK Task | cascade delete |
 | user_id | FK User | team member or the ticket's client (#43) |
 | body | text | markdown |
-| created_at | timestamp | editable window 15 min `ponytail:` |
+| created_at | timestamp | post-only (no edit/delete; domain decision) |
 
 ### TaskAttachment (#34)
 | Field | Type | Notes |
