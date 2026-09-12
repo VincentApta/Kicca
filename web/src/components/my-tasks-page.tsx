@@ -99,10 +99,10 @@ export default function MyTasksPage({ onSelectTask }: Props) {
 
               {/* status + priority labels */}
               <div className="shrink-0 flex items-center gap-1.5 mt-0.5">
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${STATUS_COLORS[task.status]}`}>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${STATUS_COLORS[task.status]}`}>
                   {STATUS_LABELS[task.status]}
                 </span>
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${PRIORITY_COLORS[task.priority]}`}>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${PRIORITY_COLORS[task.priority]}`}>
                   {PRIORITY_LABELS[task.priority]}
                 </span>
               </div>
