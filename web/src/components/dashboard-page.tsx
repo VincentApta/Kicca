@@ -14,17 +14,17 @@ import {
   projectStats, throughput,
 } from '@/lib/dashboard-math'
 
-const STATUS_DOT: Record<string, string> = {
+export const STATUS_DOT: Record<string, string> = {
   inbox: 'bg-status-inbox', backlog: 'bg-status-backlog',
   in_progress: 'bg-status-in-progress', review: 'bg-status-review',
   done: 'bg-status-done', blocked: 'bg-status-blocked',
 }
-const TYPE_FILL: Record<string, string> = {
+export const TYPE_FILL: Record<string, string> = {
   task: 'bg-status-in-progress', bug: 'bg-priority-urgent',
   feature: 'bg-status-review', chore: 'bg-status-backlog',
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+export function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="card-neu flex items-center gap-4">
       <div className="inset-neu flex size-10 shrink-0 items-center justify-center text-primary">{icon}</div>
@@ -41,7 +41,7 @@ function initials(name: string) {
 }
 
 /** Compact SVG line chart: actual solid + ideal dashed. */
-function BurnChart({ actual, ideal, mode }: {
+export function BurnChart({ actual, ideal, mode }: {
   actual: { date: string; remaining: number }[]
   ideal: { date: string; ideal: number }[]
   mode: 'points' | 'count'
@@ -62,7 +62,7 @@ function BurnChart({ actual, ideal, mode }: {
 }
 
 /** Compact SVG bar chart. */
-function BarChart({ data, label }: { data: { date: string; count: number }[]; label: string }) {
+export function BarChart({ data, label }: { data: { date: string; count: number }[]; label: string }) {
   const W = 560, H = 160, PAD = 8
   const max = Math.max(1, ...data.map((p) => p.count))
   const bw = (W - 2 * PAD) / data.length
@@ -80,7 +80,7 @@ function BarChart({ data, label }: { data: { date: string; count: number }[]; la
 }
 
 /** CFD: cumulative created (upper) vs cumulative done (lower). */
-function CfdChart({ data }: { data: { date: string; created: number; done: number }[] }) {
+export function CfdChart({ data }: { data: { date: string; created: number; done: number }[] }) {
   const W = 560, H = 160, PAD = 8
   const max = Math.max(1, ...data.map((p) => p.created))
   const x = (i: number) => PAD + (i / Math.max(1, data.length - 1)) * (W - 2 * PAD)

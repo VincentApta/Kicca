@@ -19,6 +19,7 @@ import { TaskDrawer } from './task-drawer'
 import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
 import MyTasksPage from './my-tasks-page'
 import { DashboardPage } from './dashboard-page'
+import { ProjectAnalyticsPage } from './project-analytics'
 import { ProjectsListPage } from './projects-list-page'
 import { BoardSkeleton, EmptyState, ListSkeleton } from './skeletons'
 import { useAuth } from '@/lib/auth'
@@ -448,6 +449,18 @@ export function Workspace() {
               setCurrentProjectId(null)
               refreshProject()
               setView('projects')
+            }}
+          />
+        ) : (
+          <BootSkeleton />
+        )
+      ) : view === 'analytics' ? (
+        project ? (
+          <ProjectAnalyticsPage
+            project={project}
+            onSelectTask={(taskId) => {
+              setView('board')
+              setTimeout(() => setDrawerId(taskId), 50)
             }}
           />
         ) : (

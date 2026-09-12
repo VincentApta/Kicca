@@ -105,7 +105,7 @@ export function Topbar({
   onBulkDelete?: () => void
 }) {
   const showBoardControls = view === 'board' || view === 'list' || view === 'trash'
-  const inProjectView = showBoardControls || view === 'settings'
+  const inProjectView = showBoardControls || view === 'settings' || view === 'analytics'
   const showFilters = showBoardControls && !selectMode
   const nActive = showFilters ? filtersActive(filters) + (search.trim() ? 1 : 0) : 0
 

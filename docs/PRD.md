@@ -52,11 +52,14 @@ Title, description (markdown), assignee (0..1), priority (Urgent/High/Medium/Low
 - US-10 As member, I filter/search tasks: text, assignee, priority, label, status; list view alternative to board.
 - US-11 As member, I comment on tasks.
 - US-12 As member, I soft-delete (trash) and restore tasks; trashed hidden from board.
+- US-16 As member, I multi-select tasks on the board/list and move them to a column, assign, or trash them in one bulk action (all-or-nothing server-side).
 ### GitHub
 - US-13 As project admin, I store GitHub PAT + repo (owner/name) per project; PAT encrypted at rest, never returned by API.
 - US-14 As member, I push a task to GitHub → issue created (title + body incl. description), link `#number` + URL stored and shown on card/detail. Idempotent: already-linked task errors clearly, no duplicate issue.
 ### Housekeeping
 - US-15 As member, dark theme default; toggle light persists.
+### Analytics
+- US-17 As member, I open per-project analytics (stat row, burndown, throughput, cycle time distribution, type mix, cumulative flow, aging WIP) scoped to one project — same math and charts as the global dashboard, no new backend surface.
 
 ## Acceptance criteria (release gate)
 - Fresh `docker compose up` → seeded admin → login → create team/project/task → drag across columns → persisted after restart.
