@@ -3,6 +3,7 @@ import { api, ApiError } from '@/lib/api'
 import type { Task } from '@/lib/types'
 import { useAuth } from '@/lib/auth'
 import { STATUS_LABELS, PRIORITY_LABELS } from '@/lib/labels'
+import { Button } from './ui/button'
 
 // Light-mode readable pills: dark text on light tint in light mode,
 // original light text on dark tint in dark mode.
@@ -30,18 +31,24 @@ interface Props {
 export default function MyTasksPage({ onSelectTask }: Props) {
   const { state } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (state.phase !== 'authenticated') return
     setLoading(true)
+    setError(null)
     api
-      .myFetchMyTasks(state.user.id)
-      .then((res) => setTasks(res.data))
+      .myFetchMyTasks(state.user.id, page)
+      .then((res) => {
+        setTasks((prev) => (page === 1 ? res.data : [...prev, ...res.data]))
+        setTotal(res.total)
+      })
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Failed to load tasks'))
       .finally(() => setLoading(false))
-  }, [state])
+  }, [state, page])
 
   if (loading) {
     return (
@@ -69,7 +76,7 @@ export default function MyTasksPage({ onSelectTask }: Props) {
     <div className="flex-1 overflow-auto p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-foreground">My Tasks</h1>
-        <span className="text-xs text-muted-foreground/50">{tasks.length} task{tasks.length !== 1 && 's'}</span>
+        <span className="text-xs text-muted-foreground/50">{total} task{total !== 1 && 's'}</span>
       </div>
 
       {/* simple neumorphic list rows — one per task, click → open in project board */}
@@ -117,6 +124,19 @@ export default function MyTasksPage({ onSelectTask }: Props) {
           </li>
         ))}
       </ul>
+
+      {tasks.length < total && (
+        <div className="pt-2 text-center">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Show more ({total - tasks.length} left)
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
