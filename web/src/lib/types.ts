@@ -225,3 +225,16 @@ export type Notification = {
   from_status?: string
   to_status: string
 }
+
+/** Global search (GET /api/search) — team-only cross-project results. */
+export type SearchResult = {
+  tasks: {
+    id: string
+    project_id: string
+    project_key: string
+    number: number
+    title: string
+    status: Status
+  }[]
+  projects: { id: string; key: string; name: string }[]
+}
