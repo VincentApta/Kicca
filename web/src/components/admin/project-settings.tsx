@@ -76,6 +76,7 @@ export function FirstProjectDialog({
   const [key, setKey] = useState('')
   const [errors, setErrors] = useState<FieldErrors>({})
   const [busy, setBusy] = useState(false)
+  const [extraTeamIds, setExtraTeamIds] = useState<string[]>([])
 
   useEffect(() => {
     if (open) {
@@ -83,6 +84,7 @@ export function FirstProjectDialog({
       setTeamName('')
       setName('')
       setKey('')
+      setExtraTeamIds([])
       setErrors({})
       api.listTeams().then(
         ({ data }) => {
@@ -110,8 +112,11 @@ export function FirstProjectDialog({
     setBusy(true)
     try {
       const team = creatingTeam ? await api.createTeam(teamName.trim()) : null
+      const ownerId = team ? team.id : teamId!
+      const contributors = [ownerId, ...extraTeamIds.filter((id) => id !== ownerId)]
       const project = await api.createProject({
-        team_id: team ? team.id : teamId!,
+        team_id: ownerId,
+        team_ids: contributors,
         name: name.trim(),
         key: key.trim()
       })
@@ -173,6 +178,35 @@ export function FirstProjectDialog({
                 autoFocus
               />
             </Field>
+          )}
+          {(teams?.length ?? 0) > 1 && teamId !== '__new__' && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-sm font-medium">Contributing teams (optional)</span>
+              <div className="flex flex-wrap gap-2">
+                {teams!.filter((t) => t.id !== teamId).map((t) => {
+                  const on = extraTeamIds.includes(t.id)
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() =>
+                        setExtraTeamIds((cur) =>
+                          on ? cur.filter((x) => x !== t.id) : [...cur, t.id],
+                        )
+                      }
+                      className={`rounded-lg border px-2.5 py-1 text-sm transition-colors ${
+                        on
+                          ? 'border-primary bg-primary/10 text-foreground'
+                          : 'border-border text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {on ? '✓ ' : ''}{t.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           )}
           {teamId === '__new__' && (teams?.length ?? 0) > 0 && (
             <Field label="New team name" htmlFor="first-project-team-name" error={errors.team}>
