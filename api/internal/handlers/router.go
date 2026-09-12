@@ -107,6 +107,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	// notifications — team + client both
 	notif := api.Group("/notifications", middleware.RequireAuth(jwtSecret, gdb))
 	notif.Get("/", ListNotifications(gdb))
+	notif.Get("/stream", NotificationStream(gdb)) // SSE; static before any param route
 	notif.Post("/read", MarkNotificationsRead(gdb))
 
 	// global search — team only (clients have their own ticket search)

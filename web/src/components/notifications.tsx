@@ -37,13 +37,37 @@ export function NotificationBell({
   const [items, setItems] = useState<AppNotification[]>([])
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(() => {
     api.listNotifications().then((r) => setItems(r.data)).catch(() => { /* swallow */ })
   }, [])
 
-  useEffect(() => { load(); timer.current = setInterval(load, 30_000); return () => { if (timer.current) clearInterval(timer.current) } }, [load])
+  // SSE push (server tick); fall back to 30s poll if the stream errors.
+  useEffect(() => {
+    load() // immediate first paint
+    let poll: ReturnType<typeof setInterval> | null = null
+    let es: EventSource | null = null
+    try {
+      es = new EventSource('/api/notifications/stream')
+      es.onmessage = (m) => {
+        try {
+          setItems(JSON.parse(m.data) as AppNotification[])
+        } catch {
+          /* malformed frame: ignore */
+        }
+      }
+      es.onerror = () => {
+        es?.close()
+        if (!poll) poll = setInterval(load, 30_000)
+      }
+    } catch {
+      poll = setInterval(load, 30_000)
+    }
+    return () => {
+      es?.close()
+      if (poll) clearInterval(poll)
+    }
+  }, [load])
 
   // click-outside close
   useEffect(() => {
