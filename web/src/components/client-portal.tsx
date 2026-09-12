@@ -32,14 +32,14 @@ import { STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
 import type { Attachment, ClientComment, ClientProjectRef, ClientTicket, Status, TaskActivityEvent } from '@/lib/types'
 
-// Same palette as my-tasks-page pills.
+// Same palette as my-tasks-page pills (light-mode readable via dark: variants).
 const STATUS_COLORS: Record<string, string> = {
   inbox: 'text-muted-foreground/70 bg-muted/30 border-border/40',
-  backlog: 'text-blue-400/80 bg-blue-900/15 border-blue-400/25',
-  in_progress: 'text-amber-400 bg-amber-900/20 border-amber-400/30',
-  review: 'text-violet-400 bg-violet-900/15 border-violet-400/25',
-  done: 'text-emerald-400 bg-emerald-900/15 border-emerald-400/25',
-  blocked: 'text-red-400 bg-red-900/15 border-red-400/25',
+  backlog: 'text-blue-700 bg-blue-100 border-blue-300 dark:text-blue-400/80 dark:bg-blue-900/15 dark:border-blue-400/25',
+  in_progress: 'text-amber-700 bg-amber-100 border-amber-300 dark:text-amber-400 dark:bg-amber-900/20 dark:border-amber-400/30',
+  review: 'text-violet-700 bg-violet-100 border-violet-300 dark:text-violet-400 dark:bg-violet-900/15 dark:border-violet-400/25',
+  done: 'text-emerald-700 bg-emerald-100 border-emerald-300 dark:text-emerald-400 dark:bg-emerald-900/15 dark:border-emerald-400/25',
+  blocked: 'text-red-700 bg-red-100 border-red-300 dark:text-red-400 dark:bg-red-900/15 dark:border-red-400/25',
   trash: 'text-muted-foreground/40 bg-muted/10 border-border/30 line-through',
 }
 
