@@ -1,4 +1,4 @@
-import { DownloadIcon, ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareKanbanIcon, SunIcon, XIcon } from 'lucide-react'
+import { DownloadIcon, ListIcon, LogOutIcon, MoonIcon, SearchIcon, SquareKanbanIcon, SunIcon, UserIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -71,6 +71,7 @@ export function Topbar({
   theme,
   onToggleTheme,
   me,
+  onProfile,
   onLogout,
   onExport,
 }: {
@@ -86,6 +87,7 @@ export function Topbar({
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   me: User
+  onProfile: () => void
   onLogout: () => void
   onExport: () => void
 }) {
@@ -225,6 +227,13 @@ export function Topbar({
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
+            {/* self-service profile (#49) — non-admin; admins keep the Users page */}
+            {me.global_role !== 'admin' && (
+              <DropdownMenuItem onClick={onProfile}>
+                <UserIcon strokeWidth={1.5} />
+                Profile
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onLogout}>
               <LogOutIcon strokeWidth={1.5} />
               Log out

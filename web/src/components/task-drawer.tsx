@@ -3,6 +3,7 @@ import Markdown from 'react-markdown'
 import { CheckIcon, PaperclipIcon, PencilIcon, SendIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { GithubIcon } from '@/components/github-icon'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
+import { ActivityTimeline } from '@/components/activity-timeline'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,6 +35,7 @@ import type {
   ProjectMember,
   Status,
   Task,
+  TaskActivityEvent,
   TaskPatch,
 } from '@/lib/types'
 
@@ -114,6 +116,7 @@ function DrawerBody({
   const [creatingGh, setCreatingGh] = useState(false)
   const [atts, setAtts] = useState<Attachment[] | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [events, setEvents] = useState<TaskActivityEvent[] | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -126,6 +129,11 @@ function DrawerBody({
     api.listAttachments(task.id).then(
       ({ data }) => setAtts(data),
       () => setAtts([]),
+    )
+    setEvents(null)
+    api.taskEvents(task.id).then(
+      ({ data }) => setEvents(data),
+      () => setEvents([]),
     )
   }, [task.id])
 
@@ -541,6 +549,24 @@ function DrawerBody({
               {creatingGh ? 'Creating…' : 'Create GitHub issue'}
             </Button>
           )}
+        </section>
+
+        {/* activity — read-only transition timeline, newest first (#44) */}
+        <section className="mt-6" aria-label="Activity">
+          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Activity
+          </h3>
+          {events === null && (
+            <div className="mt-2 flex flex-col gap-3" aria-hidden>
+              {[0, 1].map((i) => (
+                <div key={i} className="h-3 w-48 animate-pulse rounded bg-secondary" />
+              ))}
+            </div>
+          )}
+          {events?.length === 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">No activity yet.</p>
+          )}
+          {events && events.length > 0 && <ActivityTimeline events={events} />}
         </section>
 
         {/* comments */}

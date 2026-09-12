@@ -11,7 +11,7 @@ import type { User } from '@/lib/types'
 const users: User[] = [
   { id: 'u1', email: 'root@kica.dev', name: 'Root Admin', global_role: 'admin' },
   { id: 'u2', email: 'ada@kica.dev', name: 'Ada Lovelace', global_role: 'member' },
-  { id: 'u3', email: 'grace@kica.dev', name: 'Grace Hopper', global_role: 'member' },
+  { id: 'u3', email: 'grace@kica.dev', name: 'Grace Hopper', global_role: 'member', disabled: true },
 ]
 
 function json(body: unknown, status = 200) {
@@ -68,6 +68,13 @@ describe('UsersPage render', () => {
     expect(document.querySelectorAll('table tbody tr')).toHaveLength(3)
     expect(document.querySelector('[aria-label="Edit Ada Lovelace"]')).toBeTruthy()
     expect(document.querySelector('[aria-label="New user"], button')).toBeTruthy()
+
+    // disable/enable row toggles (#45): self-disable blocked, disabled row
+    // greys + badges
+    expect(document.querySelector('[aria-label="Disable Ada Lovelace"]')).toBeTruthy()
+    expect(document.querySelector('[aria-label="Enable Grace Hopper"]')).toBeTruthy()
+    expect(document.querySelector('[aria-label="Disable Root Admin"]')?.hasAttribute('disabled')).toBe(true)
+    expect(text).toContain('Disabled')
 
     // dump-dom for the ticket report
     console.log('[dump-dom users page]\n' + host.innerHTML.replace(/\s+/g, ' ').slice(0, 1500))

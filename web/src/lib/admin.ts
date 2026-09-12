@@ -32,6 +32,25 @@ export function validateUserEdit(name: string, password: string): FieldErrors {
   return errors
 }
 
+// Profile form (#49): name always; password triple only when a new password
+// is entered. Same password minimum as the admin forms.
+export function validateProfile(input: {
+  name: string
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+}): FieldErrors {
+  const errors: FieldErrors = {}
+  if (!input.name.trim()) errors.name = 'Name is required.'
+  if (input.newPassword) {
+    if (!input.currentPassword) errors.currentPassword = 'Enter your current password.'
+    if (input.newPassword.length < 8) errors.newPassword = 'Use at least 8 characters.'
+    else if (input.newPassword !== input.confirmPassword)
+      errors.confirmPassword = 'Passwords do not match.'
+  }
+  return errors
+}
+
 export function validateTeamName(name: string): FieldErrors {
   return name.trim() ? {} : { name: 'Name is required.' }
 }

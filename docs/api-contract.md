@@ -18,17 +18,16 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | POST | /auth/login | `{email, password}` | 200 `{user}` + cookie | 401 invalid/disabled |
 | POST | /auth/logout | — | 204 | clears cookie |
 | GET | /auth/me | — | 200 `{user}` | |
+| PATCH | /me | `{name?, current_password?, new_password?}` | 200 user | self-service profile (#49), non-admin only (admin → 403); password change verifies current_password (422 on mismatch); email never changes here |
 
-`user` = `{id, email, name, global_role}`.
+`user` = `{id, email, name, global_role}`. Admin user-management responses add `disabled: true` for soft-disabled accounts (#45; omitted when active) and `project_ids: []` for client-role rows.
 
 ### Users (global admin)
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | /users | ?page | list |
 | POST | /users | `{email, name, password, global_role, project_ids?}` | 201 user; 409 email exists; client role requires ≥1 project_id |
-| PATCH | /users/:id | `{name?, global_role?, password?, disabled?, project_ids?}` | project_ids (client only) replaces links; client→member drops them |
-
-`user` (user-management responses) may add `project_ids: []` for client-role rows.
+| PATCH | /users/:id | `{name?, global_role?, password?, disabled?, project_ids?}` | project_ids (client only) replaces links; client→member drops them; `disabled` toggles disabled_at (#45) — 409 `self_disable` on your own account, 409 `last_admin` on the last enabled admin |
 
 ### Teams (global admin; members read)
 | Method | Path | Body | Notes |
@@ -58,6 +57,7 @@ Errors: `{ "error": { "code": "string", "message": "string" } }`, proper status 
 | GET | /projects/:id/tasks | `?status=&assignee_id=&priority=&label=&q=&page=` (default excludes trash) | `{data, page, per_page, total}` |
 | GET | /tasks | `?assignee_id=&page=&per_page=` (assignee optional) | global feed across visible projects; rows add `project_key`, `project_name` |
 | GET | /tasks/events | `?days=30&project_id=` (days capped 90) | `{days, data: [{date, counts: {status: n}}]}` end-of-day status counts (#26) |
+| GET | /tasks/:id/events | — | activity timeline (#44): `{data: [{id, from_status, to_status, actor: user, at}]}` newest-first, `from_status` null = creation; visibility-scoped like the task; read-only |
 | GET | /tasks/export | `?project_id=&status=&assignee_id=&priority=&label=&q=` | 200 text/csv attachment (#50): same filters + visibility as the lists; project_id optional (omit = all visible projects). RFC4180 + UTF-8 BOM; columns id, number, title, status, priority, type, assignee, labels, created_by, created_at, updated_at, started_at, done_at, estimate, due_date, description |
 | POST | /projects/:id/tasks | `{title, description?, status?, priority?, type?, estimate?, assignee_id?, due_date?, label_ids?[]}` | 201 task; defaults status=backlog priority=medium type=task |
 | GET | /tasks/:id | — | task + labels + gh_link + comments separate |
@@ -88,6 +88,7 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 | POST | /client/tickets | `{project_id, title, description}` | 201 ticket → task status=inbox, created_by=client, per-project numbering; unlinked project 404 (no leak) |
 | GET | /client/tickets | ?q=&project_id=&status=&page | own tickets (created_by=me, linked projects), newest-updated first; q matches title/description (case-insensitive), project_id must be a linked project (unlinked → empty, no leak), status = `open` (not done) \| `closed` (done) (#47) |
 | GET/POST | /client/tickets/:id/attachments | multipart `file` | own tickets only; listing/streaming limited to attachments the client created |
+| GET | /client/tickets/:id/events | — | activity timeline (#44), own tickets only; actor = `{name}` — no email or role |
 | GET/POST | /client/tickets/:id/comments | `{body}` (#43) | own tickets only; whole thread (team + client comments), oldest first |
 | GET | /client/tickets/export | ?q=&project_id=&status= | 200 text/csv attachment (#50): own tickets, same filters as the list; columns id, project, number, title, status, created_at, updated_at, description (team-only fields never serialize) |
 
@@ -108,4 +109,5 @@ Enums: `type` = `task|bug|feature|chore`. `estimate` = int >= 0 or null. `starte
 ## Auth/permission summary
 - Every `/projects/:id/*` and `/tasks/*` route: membership or global admin check first, then role check.
 - Client role: 403 on every team route (/users, /teams, /projects, /tasks, /labels); team users: 403 on /client/*. /auth/* stays open to all roles.
+- PATCH /api/me (#49): non-admin only — admins keep the Users page.
 - GH token field never serialized in any response.

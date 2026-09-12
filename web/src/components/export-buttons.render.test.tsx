@@ -41,6 +41,7 @@ describe('Topbar export button (#50)', () => {
           onToggleTheme={() => {}}
           me={me}
           onLogout={() => {}}
+          onProfile={() => {}}
           onExport={onExport}
         />,
       )
@@ -73,6 +74,7 @@ describe('Topbar export button (#50)', () => {
           onToggleTheme={() => {}}
           me={me}
           onLogout={() => {}}
+          onProfile={() => {}}
           onExport={() => {}}
         />,
       )

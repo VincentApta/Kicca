@@ -18,6 +18,7 @@ import type {
   ProjectRole,
   Status,
   Task,
+  TaskActivityEvent,
   TaskCreate,
   TaskEventsDay,
   TaskPatch,
@@ -85,6 +86,8 @@ export const api = {
     req<{ user: User }>('/auth/login', { method: 'POST', body: { email, password } }),
   logout: () => req<void>('/auth/logout', { method: 'POST' }),
   me: (signal?: AbortSignal) => req<{ user: User }>('/auth/me', { signal }),
+  patchMe: (body: { name?: string; current_password?: string; new_password?: string }) =>
+    req<User>('/me', { method: 'PATCH', body }), // self-service profile (#49), non-admin
 
   // Users (global admin)
   listUsers: (page = 1) =>
@@ -153,6 +156,10 @@ export const api = {
     req<{ days: number; data: TaskEventsDay[] }>(
       `/tasks/events?days=${days}${projectId ? `&project_id=${projectId}` : ''}`,
     ),
+
+  // Activity timeline (#44): a task's transition log, newest first.
+  taskEvents: (taskId: string) =>
+    req<{ data: TaskActivityEvent[] }>(`/tasks/${taskId}/events`),
 
   // Tasks
   listTasks: (
@@ -224,6 +231,8 @@ export const api = {
     req<{ data: Attachment[] }>(`/client/tickets/${ticketId}/attachments`),
   clientUploadTicketAttachment: (ticketId: string, file: File) =>
     req<Attachment>(`/client/tickets/${ticketId}/attachments`, { method: 'POST', body: fileForm(file) }),
+  clientTicketEvents: (ticketId: string) =>
+    req<{ data: TaskActivityEvent[] }>(`/client/tickets/${ticketId}/events`),
 
   // Client ticket comments (#43) — author name only in responses
   clientListTicketComments: (ticketId: string) =>

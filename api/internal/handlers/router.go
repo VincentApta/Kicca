@@ -34,6 +34,9 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	authG.Post("/logout", Logout)
 	authG.Get("/me", middleware.RequireAuth(jwtSecret, gdb), Me)
 
+	// self-service profile (#49): current user, non-admin only
+	api.Patch("/me", middleware.RequireAuth(jwtSecret, gdb), PatchMe(gdb))
+
 	// user management — global admin only (implies non-client)
 	users := api.Group("/users", middleware.RequireAdmin(jwtSecret, gdb))
 	users.Get("/", ListUsers(gdb))
@@ -77,6 +80,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	tasks.Get("/events", TaskEvents(gdb))
 	tasks.Get("/export", ExportTasks(gdb))
 	tasks.Get("/:id", GetTask(gdb))
+	tasks.Get("/:id/events", TaskActivity(gdb))
 	tasks.Patch("/:id", PatchTask(gdb))
 	tasks.Delete("/:id", DeleteTask(gdb))
 	tasks.Post("/:id/restore", RestoreTask(gdb))
@@ -107,6 +111,7 @@ func Register(app *fiber.App, gdb *gorm.DB, jwtSecret string, ghEncKey *[32]byte
 	client.Get("/tickets/export", ClientExportTickets(gdb)) // static before /:id
 	client.Post("/tickets/:id/attachments", ClientUploadTicketAttachment(gdb))
 	client.Get("/tickets/:id/attachments", ClientListTicketAttachments(gdb))
+	client.Get("/tickets/:id/events", ClientTicketEvents(gdb))
 	client.Get("/tickets/:id/comments", ClientListTicketComments(gdb))
 	client.Post("/tickets/:id/comments", ClientCreateTicketComment(gdb))
 }

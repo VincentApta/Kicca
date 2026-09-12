@@ -18,6 +18,7 @@ const AuthCtx = createContext<{
   state: AuthState
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  updateUser: (user: User) => void
 } | null>(null)
 
 export function useAuth() {
@@ -48,5 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ phase: 'anonymous' })
   }, [])
 
-  return <AuthCtx.Provider value={{ state, login, logout }}>{children}</AuthCtx.Provider>
+  // profile saves (#49) push the fresh user shape back into the session state
+  const updateUser = useCallback((user: User) => {
+    setState((s) => (s.phase === 'authenticated' ? { phase: 'authenticated', user } : s))
+  }, [])
+
+  return <AuthCtx.Provider value={{ state, login, logout, updateUser }}>{children}</AuthCtx.Provider>
 }

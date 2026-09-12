@@ -5,6 +5,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { DownloadIcon, LogOutIcon, MoonIcon, PaperclipIcon, PlusIcon, SearchIcon, SendIcon, SunIcon, TicketIcon } from 'lucide-react'
 import { ATTACHMENT_ACCEPT, AttachmentThumb } from '@/components/attachments'
+import { ActivityTimeline } from '@/components/activity-timeline'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -28,7 +29,7 @@ import { useAuth } from '@/lib/auth'
 import { useTheme } from '@/hooks/use-theme'
 import { STATUS_LABELS, SelectLabel } from '@/lib/labels'
 import { useToast } from '@/lib/toast'
-import type { Attachment, ClientComment, ClientProjectRef, ClientTicket, Status } from '@/lib/types'
+import type { Attachment, ClientComment, ClientProjectRef, ClientTicket, Status, TaskActivityEvent } from '@/lib/types'
 
 // Same palette as my-tasks-page pills.
 const STATUS_COLORS: Record<string, string> = {
@@ -72,6 +73,7 @@ export function ClientPortal() {
   const [tickets, setTickets] = useState<ClientTicket[] | null>(null)
   const [detail, setDetail] = useState<ClientTicket | null>(null)
   const [detailAtts, setDetailAtts] = useState<Attachment[] | null>(null)
+  const [detailEvents, setDetailEvents] = useState<TaskActivityEvent[] | null>(null)
   const [detailComments, setDetailComments] = useState<ClientComment[] | null>(null)
   const [commentBody, setCommentBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -123,11 +125,12 @@ export function ClientPortal() {
   }, [])
 
   // ticket detail loads its attachments (client-created ones only — the
-  // server filters to what this client may stream) and the comment thread
-  // (#43: team comments arrive with the author name only)
+  // server filters to what this client may stream), activity timeline (#44)
+  // and the comment thread (#43: team comments arrive with the author name only)
   useEffect(() => {
     if (!detail) {
       setDetailAtts(null)
+      setDetailEvents(null)
       setDetailComments(null)
       setCommentBody('')
       return
@@ -135,6 +138,10 @@ export function ClientPortal() {
     api.clientListTicketAttachments(detail.id).then(
       ({ data }) => setDetailAtts(data),
       () => setDetailAtts([]),
+    )
+    api.clientTicketEvents(detail.id).then(
+      ({ data }) => setDetailEvents(data),
+      () => setDetailEvents([]),
     )
     api.clientListTicketComments(detail.id).then(
       ({ data }) => setDetailComments(data),
@@ -468,6 +475,18 @@ export function ClientPortal() {
                       <AttachmentThumb key={a.id} a={a} />
                     ))}
                   </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground">Activity</span>
+                {detailEvents === null && (
+                  <div className="h-3 w-40 animate-pulse rounded bg-secondary" aria-hidden />
+                )}
+                {detailEvents?.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No activity yet.</p>
+                )}
+                {detailEvents && detailEvents.length > 0 && (
+                  <ActivityTimeline events={detailEvents} />
                 )}
               </div>
               {/* ---- comments thread (#43): read team questions, reply ---- */}

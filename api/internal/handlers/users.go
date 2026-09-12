@@ -178,6 +178,12 @@ func PatchUser(gdb *gorm.DB) fiber.Handler {
 			updates["password_hash"] = hash
 		}
 		if req.Disabled != nil {
+			// self-disable guard (#45): an admin locking their own account
+			// out mid-session; enabling yourself is a no-op (you can't be
+			// disabled and still hold a session).
+			if *req.Disabled && user.ID == currentUser(c).ID {
+				return httpErr(c, fiber.StatusConflict, "self_disable", "you cannot disable your own account")
+			}
 			if *req.Disabled {
 				updates["disabled_at"] = time.Now().UTC()
 			} else {

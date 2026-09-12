@@ -9,6 +9,7 @@ import { ListView } from './list-view'
 import { CreateTaskDialog } from './create-task-dialog'
 import { TaskDrawer } from './task-drawer'
 import { FirstProjectDialog, ProjectSettingsPage, TeamsPage, UsersPage } from './admin-pages'
+import { ProfilePage } from './profile-page'
 import MyTasksPage from './my-tasks-page'
 import { DashboardPage } from './dashboard-page'
 import { ProjectsListPage } from './projects-list-page'
@@ -264,7 +265,7 @@ export function Workspace() {
     // working admin nav; members can only be added by an admin.
     const isAdmin = me.global_role === 'admin'
     return (
-      <ShellFrame projects={projects} me={me} theme={theme} onToggleTheme={toggle} onLogout={logout} view={view}
+      <ShellFrame projects={projects} me={me} theme={theme} onToggleTheme={toggle} onLogout={logout} onProfile={() => setView('profile')} view={view}
         onView={(v) => setView(v)} filters={filters} onFilters={setFilters} members={[]} labels={[]}
         search={search} onSearch={setSearch} project={null}
         collapsed={collapsed} onToggleCollapsed={() => setCollapsed((c) => !c)}
@@ -275,6 +276,8 @@ export function Workspace() {
           <TeamsPage />
         ) : view === 'users' ? (
           <UsersPage />
+        ) : view === 'profile' ? (
+          <ProfilePage />
         ) : (
           <EmptyState
             title="No projects yet"
@@ -320,6 +323,7 @@ export function Workspace() {
       theme={theme}
       onToggleTheme={toggle}
       onLogout={logout}
+      onProfile={() => setView('profile')}
       view={view}
       onView={(v) => setView(v)}
       filters={filters}
@@ -379,6 +383,8 @@ export function Workspace() {
         <TeamsPage />
       ) : view === 'users' ? (
         <UsersPage />
+      ) : view === 'profile' ? (
+        <ProfilePage />
       ) : view === 'mytasks' ? (
         <MyTasksPage
           onSelectTask={(projectId: string, taskId: string) => {
@@ -494,6 +500,7 @@ type ShellProps = {
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onLogout: () => void
+  onProfile: () => void
   view: View
   onView: (v: 'board' | 'list') => void
   filters: TaskFilters
@@ -542,6 +549,7 @@ function ShellFrame({ children, ...shell }: ShellProps) {
           theme={shell.theme}
           onToggleTheme={shell.onToggleTheme}
           me={shell.me}
+          onProfile={shell.onProfile}
           onLogout={shell.onLogout}
           onExport={shell.onExport}
         />

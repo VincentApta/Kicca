@@ -65,6 +65,7 @@ func RequireAdmin(jwtSecret string, gdb *gorm.DB) fiber.Handler {
 		if user.GlobalRole != "admin" {
 			return forbidden(c, "global admin role required")
 		}
+		c.Locals(UserKey, user) // so admin handlers can see the caller (self-guards)
 		return c.Next()
 	}
 }
